@@ -524,3 +524,31 @@ describe("with a TV remote", () => {
     });
   });
 });
+
+describe("the tile's own menu", () => {
+  test("a visible button opens it, whatever the tile is playing", async () => {
+    // Press and hold was the only way in: a mouse user never found it, and
+    // changed the quality for every tile instead of the one stalling.
+    const onLongPress = jest.fn();
+    await render(
+      <QueryWrapper>
+        <MultiviewTile
+          itemId={mockItem.Id}
+          frame={{ left: 0, top: 0, width: 320, height: 180 }}
+          muted
+          heard={false}
+          showLabel
+          onPress={jest.fn()}
+          onLongPress={onLongPress}
+        />
+      </QueryWrapper>,
+    );
+    await fireEvent.press(screen.getByLabelText("multiview.tile_menu"));
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+  });
+
+  test("the button hides with the labels", async () => {
+    await renderTile(false);
+    expect(screen.queryByLabelText("multiview.tile_menu")).toBeNull();
+  });
+});

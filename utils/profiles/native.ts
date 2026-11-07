@@ -231,8 +231,10 @@ const getMpvVideoCodecs = (supportsAv1: boolean) => {
     directPlayCodecs.push("av1");
   }
 
-  // Container-ish entries Jellyfin also matches on, kept at the tail as before
-  directPlayCodecs.push("avi", "mpeg", "mpeg2video");
+  // Container-ish entries Jellyfin also matches on, kept at the tail as before.
+  // mpeg1video too: Jellyfin probes some over-the-air ATSC channels as MPEG-1
+  // and, without it, re-encoded them even at Max. MPV (FFmpeg) decodes both.
+  directPlayCodecs.push("avi", "mpeg", "mpeg1video", "mpeg2video");
 
   return {
     codecProfile: codecProfileCodecs.join(","),

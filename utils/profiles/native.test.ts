@@ -64,4 +64,21 @@ describe("generateDeviceProfile", () => {
 
     expect(direct?.Container?.split(",")).toContain("hls");
   });
+
+  test.each(["ios", "android"] as const)(
+    "%s MPV direct plays broadcast TV the server probes as MPEG-1 video",
+    (platform) => {
+      // Jellyfin probed an HDHomeRun's ATSC channel (WFXT) as mpeg1video.
+      // With only mpeg2video listed it answered "video codec not supported"
+      // and re-encoded the channel even at Max. MPV decodes both.
+      const direct = generateDeviceProfile({
+        platform,
+        player: "mpv",
+      }).DirectPlayProfiles.find((p) => p.Type === "Video");
+      const codecs = direct?.VideoCodec?.split(",") ?? [];
+      expect(codecs).toContain("mpeg1video");
+      expect(codecs).toContain("mpeg2video");
+      expect(direct?.Container?.split(",")).toContain("ts");
+    },
+  );
 });

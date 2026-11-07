@@ -220,4 +220,31 @@ describe("useMultiviewTileStream", () => {
     const { result } = await renderHook(() => useMultiviewTileStream("chan-1"));
     await waitFor(() => expect(result.current.state.status).toBe("error"));
   });
+
+  test("a reopened tile waits for the old stream to give its tuner back", async () => {
+    // A quality change restarts every tile at once. Two live tiles on a dual
+    // tuner asked for new tuners while the old streams still held both, and
+    // spun.
+    let releaseTuner: () => void = () => {};
+    mockGetStreamUrl.mockResolvedValue(liveStream);
+    const first = await renderHook(() => useMultiviewTileStream("chan-1"));
+    await waitFor(() =>
+      expect(first.result.current.state.status).toBe("ready"),
+    );
+    mockStopped.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        releaseTuner = resolve;
+      }),
+    );
+    await first.unmount();
+    mockGetStreamUrl.mockClear();
+
+    const second = await renderHook(() => useMultiviewTileStream("chan-1"));
+    await act(async () => {});
+    expect(mockGetStreamUrl).not.toHaveBeenCalled();
+
+    await act(async () => releaseTuner());
+    await waitFor(() => expect(mockGetStreamUrl).toHaveBeenCalledTimes(1));
+    await second.unmount();
+  });
 });

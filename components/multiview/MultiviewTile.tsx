@@ -32,9 +32,10 @@ import {
   isBurnedInSubtitle,
 } from "@/utils/jellyfin/subtitleUtils";
 import { multiviewEngine } from "@/utils/multiview/availability";
-import type { TileFrame } from "@/utils/multiview/multiview";
+import type { TileFrame, TileQuality } from "@/utils/multiview/multiview";
 import { createPlaybackStartWatch } from "@/utils/multiview/playbackStart";
 import { isAtEnd, nextEpisodeIn } from "@/utils/multiview/tilePlayback";
+import { MultiviewTileStats } from "./MultiviewTileStats";
 import { useFocused } from "./useFocused";
 
 interface Props {
@@ -67,6 +68,12 @@ interface Props {
   nextFocusUp?: number;
   /** The tile's focusable view, for the toolbar's Down to come back to. */
   onTargetRef?: (handle: number | null) => void;
+  /** This tile's own quality cap; unset, it follows the shared setting. */
+  quality?: TileQuality;
+  /** The cap in force, own or shared, for the stats overlay. */
+  qualityKey?: string;
+  /** Shows what the server sends and what the player decodes. */
+  showStats?: boolean;
 }
 
 // Several players at once: MPV on iOS; on Android TV, ExoPlayer, since
@@ -89,6 +96,9 @@ export function MultiviewTile({
   hasTVPreferredFocus,
   nextFocusUp,
   onTargetRef,
+  quality,
+  qualityKey,
+  showStats,
 }: Props) {
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -102,7 +112,10 @@ export function MultiviewTile({
     playerRef.current = player;
     if (player) lastPlayer.current = player;
   }, []);
-  const { state, onPosition, onPaused } = useMultiviewTileStream(itemId);
+  const { state, onPosition, onPaused } = useMultiviewTileStream(
+    itemId,
+    quality,
+  );
   // Read when the source is built and from onLoad: a mute that arrives over
   // the bridge after an autoplaying file has started is heard for a moment.
   const mutedRef = useRef(muted);
@@ -337,6 +350,14 @@ export function MultiviewTile({
           <Loader />
         </View>
       )}
+      {showStats && state.status === "ready" && (
+        <MultiviewTileStats
+          playerRef={playerRef}
+          mediaSource={state.mediaSource}
+          qualityKey={qualityKey ?? quality?.key ?? ""}
+          tileOwnQuality={!!quality}
+        />
+      )}
       {state.status === "error" && (
         <View style={styles.center}>
           <Text className='text-neutral-400 text-center px-2'>
@@ -381,6 +402,23 @@ export function MultiviewTile({
           </View>
         )}
       </Pressable>
+      {/* The tile's own menu (quality, stats, reconnect), in sight: press
+          and hold is not something a mouse user tries, and a live channel
+          has no other buttons. Also while loading, the moment Reconnect is
+          wanted. A TV remote holds Select for it instead: a second focus
+          stop inside every tile would get in the way of moving between them. */}
+      {showLabel && !Platform.isTV && (
+        <Pressable
+          testID='multiview-tile-menu'
+          onPress={onLongPress}
+          hitSlop={6}
+          accessibilityRole='button'
+          accessibilityLabel={t("multiview.tile_menu")}
+          style={styles.menuButton}
+        >
+          <Ionicons name='ellipsis-horizontal' size={16} color='white' />
+        </Pressable>
+      )}
       {ended && (
         <View style={[styles.center, styles.endedCard]}>
           <Text className='text-white font-bold mb-2'>
@@ -516,6 +554,17 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  menuButton: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   label: {
     position: "absolute",

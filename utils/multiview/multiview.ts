@@ -18,6 +18,20 @@ export interface MultiviewTile {
   /** Stable per tile, so a tile keeps its player across layout changes. */
   key: string;
   itemId: string;
+  /**
+   * This tile's own quality cap, over the "Multiview quality" setting. Unset,
+   * the tile follows the setting. One channel can need less than the others:
+   * a weak or heavy broadcast stalls at a rate the rest play fine at.
+   */
+  quality?: TileQuality;
+  /** Counts reconnects; part of the tile's React key, so a bump reopens it. */
+  generation?: number;
+}
+
+/** A quality cap: its label and bits per second, undefined for no cap. */
+export interface TileQuality {
+  key: string;
+  value: number | undefined;
 }
 
 export interface MultiviewState {
@@ -110,6 +124,55 @@ export const playNext = (
   const removed = removeTile(state, key);
   return removed.audio === "all" ? removed : selectAudio(removed, existing.key);
 };
+
+/**
+ * Gives one tile its own quality cap, or with `quality` undefined puts it back
+ * on the shared setting. The tile reopens its stream at the new cap.
+ */
+export const setTileQuality = (
+  state: MultiviewState,
+  key: string,
+  quality: TileQuality | undefined,
+): MultiviewState => ({
+  ...state,
+  tiles: state.tiles.map((tile) => {
+    if (tile.key !== key) return tile;
+    const { quality: _old, ...rest } = tile;
+    return quality ? { ...rest, quality } : rest;
+  }),
+});
+
+/**
+ * Puts every tile back on the shared setting: what choosing a quality for all
+ * tiles means, or a tile set lower earlier would quietly stay lower.
+ */
+export const clearTileQualities = (state: MultiviewState): MultiviewState =>
+  state.tiles.some((tile) => tile.quality)
+    ? {
+        ...state,
+        tiles: state.tiles.map(({ quality: _old, ...tile }) => tile),
+      }
+    : state;
+
+/**
+ * Reopens a tile's stream from scratch, keeping its spot, sound and quality:
+ * a live channel stuck loading comes back at the live point.
+ */
+export const reconnectTile = (
+  state: MultiviewState,
+  key: string,
+): MultiviewState => ({
+  ...state,
+  tiles: state.tiles.map((tile) =>
+    tile.key === key
+      ? { ...tile, generation: (tile.generation ?? 0) + 1 }
+      : tile,
+  ),
+});
+
+/** The React key of a tile's player: a new one closes and reopens the stream. */
+export const tilePlayerKey = (tile: MultiviewTile): string =>
+  `${tile.key}:${tile.itemId}:${tile.generation ?? 0}`;
 
 /** Makes a tile the only one heard. */
 export const selectAudio = (

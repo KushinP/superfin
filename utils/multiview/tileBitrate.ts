@@ -15,9 +15,12 @@ export const DEFAULT_MULTIVIEW_BITRATE: Bitrate = {
 
 /**
  * The most a multiview tile streams at, in bits per second (undefined for no
- * cap): the "Multiview quality" setting, apart from the full player's.
+ * cap): the tile's own quality when it has one, else the "Multiview quality"
+ * setting, apart from the full player's.
  */
 export const tileMaxBitrate = (
   settings: Partial<Pick<Settings, "multiviewMaxBitrate" | "defaultBitrate">>,
+  tileQuality?: Bitrate,
 ): number | undefined =>
-  (settings.multiviewMaxBitrate ?? DEFAULT_MULTIVIEW_BITRATE).value;
+  (tileQuality ?? settings.multiviewMaxBitrate ?? DEFAULT_MULTIVIEW_BITRATE)
+    .value;

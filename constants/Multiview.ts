@@ -81,3 +81,13 @@ export const MULTIVIEW_TILE_CACHE = {
 
 /** Size, in points, of a multiview toolbar button on a TV. */
 export const MULTIVIEW_TV_TOOLBAR_BUTTON = 56;
+
+/** How often, in ms, an open stats overlay asks its tile's player for numbers. */
+export const MULTIVIEW_STATS_INTERVAL = 1_000;
+
+/**
+ * Most a tile waits, in ms, for other tiles' stop reports before it opens its
+ * own stream: long enough for the server to free a tuner, short enough that a
+ * report that never answers cannot hold a tile up.
+ */
+export const MULTIVIEW_STOP_WAIT_LIMIT = 3_000;

@@ -36,3 +36,23 @@ describe("tileMaxBitrate", () => {
     );
   });
 });
+
+describe("tileMaxBitrate with a tile's own quality", () => {
+  test("a tile's own quality wins over the setting", () => {
+    expect(
+      tileMaxBitrate(
+        { multiviewMaxBitrate: { key: "Max", value: undefined } },
+        { key: "4 Mb/s", value: 4_000_000 },
+      ),
+    ).toBe(4_000_000);
+  });
+
+  test("a tile set to Max streams uncapped even under a capped setting", () => {
+    expect(
+      tileMaxBitrate(
+        { multiviewMaxBitrate: { key: "4 Mb/s", value: 4_000_000 } },
+        { key: "Max", value: undefined },
+      ),
+    ).toBeUndefined();
+  });
+});
