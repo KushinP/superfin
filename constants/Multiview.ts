@@ -113,3 +113,24 @@ export const MULTIVIEW_LIVE_START_RECONNECT = 30_000;
  * before it stops and waits for the user.
  */
 export const MULTIVIEW_AUTO_RECONNECT_LIMIT = 3;
+
+/**
+ * How long, in ms, a live channel waits after the last live stop report was
+ * sent before it opens a stream. On 2026-11-08 a reconnect asked for Fox 2-3 s
+ * after its stop, while Jellyfin was still closing the tuner, and got HTTP 500.
+ */
+export const MULTIVIEW_LIVE_REOPEN_GAP = 5_000;
+
+/**
+ * Delays, in ms, before each new try at a live stream whose playlist the
+ * server refused. One try plus one per delay, then the tile shows its error;
+ * before, a refused open sat until MULTIVIEW_LIVE_START_RECONNECT.
+ */
+export const MULTIVIEW_LIVE_OPEN_RETRY_DELAYS = [2_000, 4_000, 8_000] as const;
+
+/**
+ * How long, in ms, the live playlist check waits for the server. Opening a
+ * channel can take it ten seconds or more; past this the player is left to
+ * judge the stream itself.
+ */
+export const MULTIVIEW_LIVE_PROBE_TIMEOUT = 20_000;

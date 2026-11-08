@@ -89,3 +89,7 @@ Gate 2 covers: no schema change and no new dependencies. Nothing else from the C
 - Probe retries are separate from the 3-in-a-row limit, per the spec's default.
 - Logging failed probes (spec P1) is built in Slice 2 and is the first thing cut.
 - Added: manual Reconnect and quality changes also wait the 5 s gap.
+
+## Changes
+- 2026-11-08: The "last live stop" clock lives in its own small module, `utils/multiview/liveReopenGap.ts`, not inside `useMultiviewTileStream.ts`. The existing hook tests use the real clock, so a test that closes a live tile would otherwise make the next test wait 5 s. The module has a reset for tests. Behavior is unchanged.
+- 2026-11-08: The probe skips any stream URL that isn't a `.m3u8` playlist ("unknown", so the player decides). Fetching a direct stream would download the channel endlessly.
