@@ -6,6 +6,7 @@ import { useAtomValue } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AppState,
   findNodeHandle,
   Platform,
   Pressable,
@@ -33,6 +34,7 @@ import {
   getExternalSubtitleUrl,
   isBurnedInSubtitle,
 } from "@/utils/jellyfin/subtitleUtils";
+import { writeToLog } from "@/utils/log";
 import { multiviewEngine } from "@/utils/multiview/availability";
 import type { TileFrame, TileQuality } from "@/utils/multiview/multiview";
 import { createPlaybackStartWatch } from "@/utils/multiview/playbackStart";
@@ -154,8 +156,17 @@ export function MultiviewTile({
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
   const [seeking, setSeeking] = useState(false);
+  // When the current stream was handed to the player, for the log of a
+  // channel that never shows a first frame.
+  const sourceSetAt = useRef(Date.now());
   // A new stream object means a reload: wait for its first frame again.
-  useEffect(() => setPlaying(false), [source]);
+  useEffect(() => {
+    sourceSetAt.current = Date.now();
+    setPlaying(false);
+  }, [source]);
+  // Seconds of video the player last said it had buffered; undefined when it
+  // never says (ExoPlayer), so the log does not read that as "ran dry".
+  const bufferedSeconds = useRef<number | undefined>(undefined);
   const [stalled, setStalled] = useState(false);
   const [ended, setEnded] = useState(false);
   // The server hears a finished tile as paused, as it hears a paused one.
@@ -206,9 +217,12 @@ export function MultiviewTile({
   }, [playing, paused]);
 
   const onProgress = useCallback(
-    (position: number, total: number) => {
+    (position: number, total: number, cacheSeconds?: number) => {
       onPosition(position);
       duration.current = total;
+      if (typeof cacheSeconds === "number") {
+        bufferedSeconds.current = cacheSeconds;
+      }
       if (position !== lastPosition.current) {
         lastPosition.current = position;
         lastMoveAt.current = Date.now();
@@ -236,15 +250,30 @@ export function MultiviewTile({
   // brings the channel back. So a channel stalled past the live cushion, or
   // one that never shows a first frame, asks to be reconnected. A pause is
   // the user's, and is left alone.
+  const itemName = state.status === "ready" ? state.item.Name : undefined;
   useEffect(() => {
     if (!isChannel || paused) return;
     if (playing && !stalled) return;
     const timer = setTimeout(
-      () => onStuckRef.current?.(),
+      () => {
+        // Why the picture froze is still unknown (spec 2026-11-08): what was
+        // buffered and whether the app was in front tell a starved stream
+        // from a stuck player from a backgrounded app.
+        const since = playing ? lastMoveAt.current : sourceSetAt.current;
+        writeToLog("WARN", "multiview: live tile stuck, reconnecting", {
+          itemId,
+          name: itemName,
+          started: playing,
+          frozenSeconds: Math.round((Date.now() - since) / 100) / 10,
+          bufferedSeconds: bufferedSeconds.current ?? "unknown",
+          appState: AppState.currentState,
+        });
+        onStuckRef.current?.();
+      },
       playing ? MULTIVIEW_LIVE_STALL_RECONNECT : MULTIVIEW_LIVE_START_RECONNECT,
     );
     return () => clearTimeout(timer);
-  }, [isChannel, paused, playing, stalled]);
+  }, [isChannel, paused, playing, stalled, itemId, itemName]);
 
   // Asked for only once an episode has ended, the one moment it is wanted.
   const nextEpisode = useQuery({
@@ -377,7 +406,11 @@ export function MultiviewTile({
           style={StyleSheet.absoluteFill}
           onLoad={() => void playerRef.current?.setMute(mutedRef.current)}
           onProgress={(e) =>
-            onProgress(e.nativeEvent.position, e.nativeEvent.duration)
+            onProgress(
+              e.nativeEvent.position,
+              e.nativeEvent.duration,
+              (e.nativeEvent as { cacheSeconds?: number }).cacheSeconds,
+            )
           }
           onPlaybackStateChange={(e) => {
             const { isPaused, isLoading } = e.nativeEvent;

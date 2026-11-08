@@ -94,11 +94,12 @@ export const MULTIVIEW_STOP_WAIT_LIMIT = 3_000;
 
 /**
  * How long, in ms, a live tile that was playing may go without new video
- * before it reconnects on its own. Longer than the live cushion
- * (LIVE_PAUSE_WAIT_SECONDS), so a tile rebuilding its buffer after a short
- * gap is left to do so.
+ * before it reconnects on its own. Far longer than the live cushion
+ * (LIVE_PAUSE_WAIT_SECONDS): at 12 s, Fox dropped four times in 13 minutes on
+ * 2026-11-08, each reconnect closing a channel the server was still sending
+ * (docs/specs/2026-11-08-live-tile-backoff.md).
  */
-export const MULTIVIEW_LIVE_STALL_RECONNECT = 12_000;
+export const MULTIVIEW_LIVE_STALL_RECONNECT = 30_000;
 
 /**
  * How long, in ms, a live tile may take to show its first frame before it
