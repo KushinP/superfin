@@ -1,6 +1,6 @@
 # Live multiview tiles stop dropping themselves
 
-Status: Approved (Gate 1)
+Status: Approved (Gates 1 and 2)
 Date: 2026-11-08
 Branch: kush/live-tile-backoff
 
