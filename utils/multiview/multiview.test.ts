@@ -20,6 +20,7 @@ import {
   setTileQuality,
   tapTile,
   tapWhileToolbar,
+  tileDrawOrder,
   tileFrames,
   tilePlayerKey,
   toggleAllAudio,
@@ -387,5 +388,57 @@ describe("automatic reconnects", () => {
   test("a tile playing normally is left as it is", () => {
     const state = live();
     expect(markTilePlaying(state, "k-fox")).toBe(state);
+  });
+});
+
+describe("tileDrawOrder", () => {
+  const keys = (state: MultiviewState) => state.tiles.map((tile) => tile.key);
+
+  test("starts in the order the tiles were added", () => {
+    expect(tileDrawOrder([], withTiles("a", "b", "c").tiles)).toEqual([
+      "k-a",
+      "k-b",
+      "k-c",
+    ]);
+  });
+
+  test("a promotion leaves the draw order as it was", () => {
+    // On Fire TV a re-ordered tile lost its player and had to reconnect.
+    const state = withTiles("a", "b", "c");
+    const before = tileDrawOrder([], state.tiles);
+    const promoted = promoteTile(state, "k-c");
+    expect(keys(promoted)).toEqual(["k-c", "k-a", "k-b"]);
+    expect(tileDrawOrder(before, promoted.tiles)).toEqual(before);
+  });
+
+  test("a removed tile drops out and the others keep their order", () => {
+    const state = promoteTile(withTiles("a", "b", "c"), "k-c");
+    const removed = removeTile(state, "k-a");
+    expect(tileDrawOrder(["k-a", "k-b", "k-c"], removed.tiles)).toEqual([
+      "k-b",
+      "k-c",
+    ]);
+  });
+
+  test("a new tile is drawn last", () => {
+    const state = addTile(withTiles("a", "b"), "d", "k-d");
+    expect(tileDrawOrder(["k-b", "k-a"], state.tiles)).toEqual([
+      "k-b",
+      "k-a",
+      "k-d",
+    ]);
+  });
+
+  test("a tile playing its next episode keeps its place", () => {
+    // Its key stays; only its item, and so its player, changes.
+    const state = playNext(withTiles("a", "b"), "k-a", "a2");
+    expect(tileDrawOrder(["k-a", "k-b"], state.tiles)).toEqual(["k-a", "k-b"]);
+  });
+
+  test("a key listed twice is drawn once", () => {
+    expect(tileDrawOrder(["k-a", "k-a"], withTiles("a", "b").tiles)).toEqual([
+      "k-a",
+      "k-b",
+    ]);
   });
 });
