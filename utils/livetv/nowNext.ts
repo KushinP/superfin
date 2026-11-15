@@ -49,3 +49,24 @@ export const nextProgramByChannel = (
 export const channelNumber = (
   channel: Pick<BaseItemDto, "ChannelNumber" | "Number">,
 ): string | null => channel.ChannelNumber || channel.Number || null;
+
+/**
+ * The program on now on each channel: started at or before `now` and not yet
+ * ended. When listings overlap, the one that started last wins.
+ */
+export const currentProgramByChannel = (
+  programs: BaseItemDto[] | null | undefined,
+  now: number,
+): Map<string, BaseItemDto> => {
+  const current = new Map<string, BaseItemDto>();
+  for (const program of programs ?? []) {
+    const channel = program.ChannelId;
+    const start = time(program.StartDate);
+    const end = time(program.EndDate);
+    if (!channel || start === null || end === null) continue;
+    if (start > now || end <= now) continue;
+    const seenStart = time(current.get(channel)?.StartDate);
+    if (seenStart === null || start > seenStart) current.set(channel, program);
+  }
+  return current;
+};

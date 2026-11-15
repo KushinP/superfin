@@ -36,3 +36,21 @@ export const LIVE_SCORES_STALE_MS = 120 * 1000;
  * fastest poll is 90 / 15 = 6, so 20 is room to spare, not a limit in use.
  */
 export const LIVE_SCORES_BUFFER_MAX = 20;
+
+/**
+ * How long before a guide program's start a game may kick off and still be
+ * that program's game: listings start on the hour, kickoffs drift a little.
+ */
+export const LIVE_SCORES_KICKOFF_GRACE_MS = 30 * 60 * 1000;
+
+/**
+ * The longest the current-program guide is trusted. It is also fetched again
+ * as soon as one of the programs on screen ends.
+ */
+export const LIVE_SCORES_GUIDE_REFRESH_MS = 5 * 60 * 1000;
+
+/**
+ * The soonest the guide is fetched again after a program ends: the server's
+ * listing can lag the clock by a few seconds.
+ */
+export const LIVE_SCORES_GUIDE_MIN_REFRESH_MS = 10 * 1000;

@@ -1,5 +1,6 @@
 import {
   channelNumber,
+  currentProgramByChannel,
   nextProgramByChannel,
   programProgress,
 } from "./nowNext";
@@ -63,6 +64,73 @@ describe("nextProgramByChannel", () => {
       ).size,
     ).toBe(0);
     expect(nextProgramByChannel(undefined, 0).size).toBe(0);
+  });
+});
+
+describe("currentProgramByChannel", () => {
+  test("picks the program on now for each channel", () => {
+    const current = currentProgramByChannel(
+      [
+        {
+          ChannelId: "a",
+          Name: "Before",
+          StartDate: iso("19:00"),
+          EndDate: iso("20:00"),
+        },
+        {
+          ChannelId: "a",
+          Name: "Now",
+          StartDate: iso("20:00"),
+          EndDate: iso("21:00"),
+        },
+        {
+          ChannelId: "b",
+          Name: "Also now",
+          StartDate: iso("19:30"),
+          EndDate: iso("20:30"),
+        },
+      ],
+      at("20:10"),
+    );
+    expect(current.get("a")?.Name).toBe("Now");
+    expect(current.get("b")?.Name).toBe("Also now");
+  });
+
+  test("a program that ends at now is over; one that starts at now is on", () => {
+    const current = currentProgramByChannel(
+      [
+        {
+          ChannelId: "a",
+          Name: "Ended",
+          StartDate: iso("19:00"),
+          EndDate: iso("20:00"),
+        },
+        {
+          ChannelId: "a",
+          Name: "Started",
+          StartDate: iso("20:00"),
+          EndDate: iso("21:00"),
+        },
+      ],
+      at("20:00"),
+    );
+    expect(current.get("a")?.Name).toBe("Started");
+  });
+
+  test("a channel with nothing on now has no entry", () => {
+    const current = currentProgramByChannel(
+      [
+        {
+          ChannelId: "a",
+          StartDate: iso("21:00"),
+          EndDate: iso("22:00"),
+        },
+        { ChannelId: "b", StartDate: iso("19:00") },
+      ],
+      at("20:00"),
+    );
+    expect(current.size).toBe(0);
+    expect(currentProgramByChannel(undefined, 0).size).toBe(0);
   });
 });
 
