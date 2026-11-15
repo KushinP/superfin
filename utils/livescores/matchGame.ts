@@ -93,12 +93,20 @@ const gameNamed = (
 const titleOf = (program: ProgramInfo) =>
   `${program.Name ?? ""} ${program.EpisodeTitle ?? ""}`;
 
+/**
+ * The listing says it is football. Only this gates polling ESPN at all, so a
+ * Tuesday of news and movies costs no request.
+ */
+export const looksLikeFootball = (
+  program: ProgramInfo | null | undefined,
+): program is ProgramInfo => !!program && FOOTBALL.test(titleOf(program));
+
 const freshMatch = ({
   program,
   games,
   network,
 }: MatchInput): MatchResult | null => {
-  if (!program || !FOOTBALL.test(titleOf(program))) return null;
+  if (!looksLikeFootball(program)) return null;
   const fits = (g: GameScore) => inSlot(program, g) && onNetwork(g, network);
 
   // The title first: an overview often recaps last week's opponent, so it
