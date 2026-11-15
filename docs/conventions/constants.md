@@ -55,6 +55,7 @@ cadence meant knowing both existed, and nothing would have failed if only one ha
 | `constants/Libraries.ts` | The Library page on a wide window: when it turns into a grid of tiles, the narrowest tile, the column cap and the gap |
 | `constants/Mac.ts` | The iPad app on the Mac: the smallest its window may be resized to |
 | `constants/Multiview.ts` | Multiview: the tile cap and layout ratios, toolbar and stall timings, skip lengths, how near the end counts as finished, the per tile buffer, and the picker's search and list sizes |
+| `constants/LiveScores.ts` | Live NFL scores on multiview tiles: ESPN's scoreboard address, how often it is polled during and before games, the spoiler delay's default, range and step, when fetched scores count as too old to show, and the delay buffer's cap |
 | `constants/Cast.ts` | Official Jellyfin Cast receiver: its session client name, the name it gets for a TV whose own name it cannot take, how long a cast waits for the TV to start, how many times its channel is tried, and the window and waits used to tell a stopped receiver from a live one |
 
 Add a new domain file when a group grows its own identity (playback, downloads,
