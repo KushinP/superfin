@@ -1,0 +1,224 @@
+{
+  "events": [
+    {
+      "id": "401873058",
+      "date": "2026-11-15T18:00Z",
+      "shortName": "KC @ ATL",
+      "status": {
+        "clock": 895.0,
+        "displayClock": "14:55",
+        "period": 3,
+        "type": {
+          "name": "STATUS_IN_PROGRESS",
+          "state": "in",
+          "completed": false,
+          "shortDetail": "14:55 - 3rd"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "3",
+              "team": {
+                "id": "1",
+                "abbreviation": "ATL",
+                "displayName": "Atlanta Falcons",
+                "location": "Atlanta",
+                "name": "Falcons"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "14",
+              "team": {
+                "id": "12",
+                "abbreviation": "KC",
+                "displayName": "Kansas City Chiefs",
+                "location": "Kansas City",
+                "name": "Chiefs"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["CBS"]
+            }
+          ],
+          "situation": {
+            "down": 2,
+            "yardLine": 72,
+            "distance": 9,
+            "downDistanceText": "2nd & 9 at KC 28",
+            "shortDownDistanceText": "2nd & 9",
+            "possessionText": "KC 28",
+            "isRedZone": false,
+            "homeTimeouts": 3,
+            "awayTimeouts": 3,
+            "possession": "12"
+          }
+        }
+      ]
+    },
+    {
+      "id": "401873060",
+      "date": "2026-11-15T18:00Z",
+      "shortName": "MIN @ GB",
+      "status": {
+        "clock": 0.0,
+        "displayClock": "0:00",
+        "period": 2,
+        "type": {
+          "name": "STATUS_HALFTIME",
+          "state": "in",
+          "completed": false,
+          "shortDetail": "Halftime"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "id": "9",
+                "abbreviation": "GB",
+                "displayName": "Green Bay Packers",
+                "location": "Green Bay",
+                "name": "Packers"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "17",
+              "team": {
+                "id": "16",
+                "abbreviation": "MIN",
+                "displayName": "Minnesota Vikings",
+                "location": "Minnesota",
+                "name": "Vikings"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["Fox"]
+            }
+          ],
+          "situation": {
+            "down": 1,
+            "yardLine": 81,
+            "distance": 11,
+            "isRedZone": false,
+            "homeTimeouts": 3,
+            "awayTimeouts": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "401873053",
+      "date": "2026-11-15T14:30Z",
+      "shortName": "NE VS DET",
+      "status": {
+        "clock": 0.0,
+        "displayClock": "0:00",
+        "period": 4,
+        "type": {
+          "name": "STATUS_FINAL",
+          "state": "post",
+          "completed": true,
+          "shortDetail": "Final"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "35",
+              "team": {
+                "id": "8",
+                "abbreviation": "DET",
+                "displayName": "Detroit Lions",
+                "location": "Detroit",
+                "name": "Lions"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "10",
+              "team": {
+                "id": "17",
+                "abbreviation": "NE",
+                "displayName": "New England Patriots",
+                "location": "New England",
+                "name": "Patriots"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["Fox"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "401873062",
+      "date": "2026-11-15T21:05Z",
+      "shortName": "SEA @ LV",
+      "status": {
+        "clock": 0.0,
+        "displayClock": "0:00",
+        "period": 0,
+        "type": {
+          "name": "STATUS_SCHEDULED",
+          "state": "pre",
+          "completed": false,
+          "shortDetail": "11/15 - 4:05 PM EST"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "id": "13",
+                "abbreviation": "LV",
+                "displayName": "Las Vegas Raiders",
+                "location": "Las Vegas",
+                "name": "Raiders"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "0",
+              "team": {
+                "id": "26",
+                "abbreviation": "SEA",
+                "displayName": "Seattle Seahawks",
+                "location": "Seattle",
+                "name": "Seahawks"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["CBS"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

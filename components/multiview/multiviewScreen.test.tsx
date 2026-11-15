@@ -127,6 +127,17 @@ jest.mock("@/hooks/useScreenKeyCommands", () => ({
 jest.mock("@/packages/expo-screen-orientation", () => ({
   OrientationLock: { LANDSCAPE: 6 },
 }));
+// Live scores are tested in multiviewScores.test.tsx; here they stand aside.
+const mockOpenScores = jest.fn();
+jest.mock("@/hooks/useLiveScores", () => ({
+  useLiveScores: () => ({ tiles: new Map(), games: [] }),
+}));
+jest.mock("@/components/multiview/useLiveScoresMenu", () => ({
+  useLiveScoresMenu: () => ({
+    label: "livescores.menu_delay",
+    open: mockOpenScores,
+  }),
+}));
 jest.mock("@/utils/multiview/availability", () => ({
   isMultiviewAvailable: () => true,
 }));
@@ -152,7 +163,8 @@ const isBig = (itemId: string) => {
 
 const MAKE_MAIN = 0;
 const RECONNECT = 3;
-const REMOVE = 4;
+// Live scores sits between Reconnect and Remove.
+const REMOVE = 5;
 
 /** Long-presses a tile and picks a menu option. */
 const menu = async (itemId: string, choice: number) => {
@@ -175,6 +187,7 @@ beforeEach(() => {
   mockItemIds = "a,b";
   mockPickerProps = null;
   mockTVMenus.length = 0;
+  mockOpenScores.mockClear();
   mockActionSheet.mockClear();
   mockOpenTileQuality.mockClear();
 });
@@ -303,6 +316,7 @@ describe("a tile's menu on TV", () => {
         "multiview.stats_quality_tile",
         "multiview.stats_show",
         "multiview.reconnect",
+        "livescores.menu_delay",
         "multiview.remove_tile",
       ]);
       expect(mockTVMenus[0].options[1].sublabel).toBe("8 Mb/s");
@@ -363,11 +377,22 @@ describe("a tile's menu on TV", () => {
     });
   });
 
-  test("Remove takes that tile away", async () => {
+  test("Live scores opens the scores menu", async () => {
     await onTV(async () => {
       await render(<MultiviewRoute />);
 
       await tvMenu("b", "WFXT", 4);
+
+      expect(mockOpenScores).toHaveBeenCalledTimes(1);
+      expect(mockUnmounts).toEqual([]);
+    });
+  });
+
+  test("Remove takes that tile away", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await tvMenu("b", "WFXT", 5);
 
       expect(drawOrder()).toEqual(["a"]);
     });
@@ -375,7 +400,7 @@ describe("a tile's menu on TV", () => {
 
   test("a phone keeps the action sheet", async () => {
     await render(<MultiviewRoute />);
-    mockSheetChoice = 5; // Cancel
+    mockSheetChoice = 6; // Cancel
 
     await act(() => mockTileProps.b.onLongPress("WFXT"));
 

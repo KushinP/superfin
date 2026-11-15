@@ -216,7 +216,8 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
   and `getAuthenticationApi` for sign-in and Quick Connect.
 - Direct HTTP is reserved for endpoints outside the SDK: Streamyfin and
   intro-skipper plugins, Web's static configuration, configurable custom sections,
-  and external services (Seerr, StreamyStats, Marlin, OpenSubtitles, Wikidata).
+  and external services (Seerr, StreamyStats, Marlin, OpenSubtitles, Wikidata,
+  ESPN's public NFL scoreboard for multiview's live scores).
   The SDK itself uses Axios; keep its custom-header transport and error handling.
   Plugin requests use the explicitly named `pluginGet` / `pluginPost` /
   `pluginPut` / `pluginDelete` extensions, not generic `Api.get` / `post` /

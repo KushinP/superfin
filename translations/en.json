@@ -1551,5 +1551,30 @@
     "on_screen": "On screen",
     "continue_watching": "Continue watching",
     "empty": "Add a channel or a show to start watching"
+  },
+  "livescores": {
+    "q1": "1st",
+    "q2": "2nd",
+    "q3": "3rd",
+    "q4": "4th",
+    "quarter_clock": "{{quarter}} {{clock}}",
+    "overtime": "OT {{clock}}",
+    "end_of_quarter": "End of {{quarter}}",
+    "half": "Half",
+    "final": "Final",
+    "final_ot": "Final/OT",
+    "unavailable_network": "Scores unavailable: ESPN can't be reached",
+    "unavailable_format": "Scores unavailable: ESPN's data has changed",
+    "unavailable_stale": "Scores unavailable: they're more than 2 minutes old",
+    "menu_delay": "Live scores: {{seconds}} s behind",
+    "menu_off": "Live scores: off",
+    "delay_more": "Show scores 5 s later",
+    "delay_less": "Show scores 5 s sooner",
+    "turn_off": "Turn live scores off",
+    "turn_on": "Turn live scores on",
+    "delay_message": "Scores show {{seconds}} seconds behind real time, so they don't give away a play before you see it. If a score arrives before the play, show scores later.",
+    "settings_enabled": "Live scores on multiview tiles",
+    "settings_delay": "Score delay",
+    "settings_delay_value": "{{seconds}} s"
   }
 }
