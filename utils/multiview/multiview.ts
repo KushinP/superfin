@@ -225,6 +225,28 @@ export const markTilePlaying = (
   };
 };
 
+/**
+ * The order tiles are drawn in, by tile key: the order they were added,
+ * whatever their place in the layout. A promotion re-orders `tiles`, and
+ * re-ordering the drawn tiles takes a tile off the window on Android, where
+ * ExoPlayerView releases its player (onDetachedFromWindow): the tile froze
+ * and its live channel reconnected. So the drawing keeps its order, and a
+ * tile only moves to its new frame. Removed tiles drop out and new ones go
+ * last.
+ */
+export const tileDrawOrder = (
+  previous: readonly string[],
+  tiles: readonly Pick<MultiviewTile, "key">[],
+): string[] => {
+  const present = new Set(tiles.map((tile) => tile.key));
+  const kept = previous.filter((key) => present.has(key));
+  const keptSet = new Set(kept);
+  const added = tiles
+    .map((tile) => tile.key)
+    .filter((key) => !keptSet.has(key));
+  return [...new Set([...kept, ...added])];
+};
+
 /** The React key of a tile's player: a new one closes and reopens the stream. */
 export const tilePlayerKey = (tile: MultiviewTile): string =>
   `${tile.key}:${tile.itemId}:${tile.generation ?? 0}`;

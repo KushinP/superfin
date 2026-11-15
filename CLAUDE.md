@@ -92,6 +92,7 @@ Native modules:
 - `android-js-timers-pause-in-background` | Delayed timers don't fire while the Android app is paused (incl. under the Cast expanded controls); zero-delay ones and fetch still do
 - `android-mpv-one-player-per-process` | MpvOwnership.kt lets one MPV renderer play per Android process, so Android TV multiview tiles use ExoPlayer (multiviewEngine) and Android phones have none
 - `exoplayer-tiles-need-pcm-and-no-audio-focus` | several ExoPlayers at once: each takes audio focus and pauses the others, and passthrough ignores volume; tiles pass multiview: true (no focus, PCM-only sink)
+- `exoplayer-view-must-not-release-on-detach` | a view is detached and reattached while on screen (a re-order, the Fire TV long-press sheet); ExoPlayerView releases only via JS destroy() and OnViewDestroys, never onDetachedFromWindow
 - `native-player-presented-after-dismiss` | iOS keeps the player session until the cross-dissolve ends, so present() right after onDismiss is refused; a new player waits for the closing one, and a swap whose player closed is dropped unless its stream ended and another item was asked for
 
 TV platform:
