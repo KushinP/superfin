@@ -93,3 +93,4 @@ Gate 2 covers: no schema change and no new dependencies. Nothing else from the C
 ## Changes
 - 2026-11-08: The "last live stop" clock lives in its own small module, `utils/multiview/liveReopenGap.ts`, not inside `useMultiviewTileStream.ts`. The existing hook tests use the real clock, so a test that closes a live tile would otherwise make the next test wait 5 s. The module has a reset for tests. Behavior is unchanged.
 - 2026-11-08: The probe skips any stream URL that isn't a `.m3u8` playlist ("unknown", so the player decides). Fetching a direct stream would download the channel endlessly.
+- 2026-11-15: Shipped from `kush/live-tile-reconnect-backoff`, which carries the four commits from `kush/live-tile-backoff` (never pushed) onto develop after #9–#13. They applied with no conflicts and no code or test changes. The full suite passes on top of #10–#13 (the TV tile menu, live NFL scores, Expo SDK 57 deps).
