@@ -37,6 +37,35 @@ export interface GameScore {
   down?: GameDown;
   /** Networks carrying it, "CBS" or "Fox". */
   networks: string[];
+  /** What the scores screen adds; each one only when ESPN gave it cleanly. */
+  details: GameDetails;
+}
+
+export interface GameLeader {
+  category: "passing" | "rushing" | "receiving";
+  /** "D. Lock". */
+  name: string;
+  /** ESPN's stat line, "2/2, 43 YDS, 1 TD". */
+  line: string;
+  /** Left out when ESPN names a team that is not in this game. */
+  teamAbbr?: string;
+}
+
+/**
+ * The scores screen's extras. Every field is optional on its own: these come
+ * from the same unofficial feed, and one that changes shape is left out
+ * rather than taking the score down with it.
+ */
+export interface GameDetails {
+  /** ESPN's text of the last play. */
+  lastPlay?: string;
+  /** Each team's chance to win, 0 to 1, after the last play. */
+  winProbability?: { home: number; away: number };
+  /** "3 plays, 19 yards, 1:20". */
+  drive?: string;
+  timeouts?: { home: number; away: number };
+  /** This game's top passer, rusher and receiver, across both teams. */
+  leaders?: GameLeader[];
 }
 
 const STATES: readonly string[] = ["pre", "in", "post"];
@@ -91,6 +120,80 @@ const down = (
     ...(possessionAbbr ? { possessionAbbr } : {}),
     redZone: situation.isRedZone === true,
   };
+};
+
+const LEADER_CATEGORIES: Record<string, GameLeader["category"]> = {
+  passingYards: "passing",
+  rushingYards: "rushing",
+  receivingYards: "receiving",
+};
+
+/** A share from 0 to 1, or nothing. */
+const share = (v: unknown): number | null => {
+  const n = num(v);
+  return n !== null && n >= 0 && n <= 1 ? n : null;
+};
+
+/** A count of timeouts, 0 to 3, or nothing. */
+const timeoutsLeft = (v: unknown): number | null => {
+  const n = num(v);
+  return n !== null && Number.isInteger(n) && n >= 0 && n <= 3 ? n : null;
+};
+
+const leaders = (raw: unknown, teams: TeamScore[]): GameLeader[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((group): GameLeader[] => {
+    if (!isObject(group)) return [];
+    const category = LEADER_CATEGORIES[str(group.name) ?? ""];
+    const top = Array.isArray(group.leaders) ? group.leaders[0] : null;
+    if (!category || !isObject(top) || !isObject(top.athlete)) return [];
+    const name = str(top.athlete.shortName)?.trim();
+    const line = str(top.displayValue)?.trim();
+    if (!name || !line) return [];
+    const teamId = isObject(top.team) ? str(top.team.id) : null;
+    const teamAbbr = teams.find((t) => t.id === teamId)?.abbr;
+    return [{ category, name, line, ...(teamAbbr ? { teamAbbr } : {}) }];
+  });
+};
+
+const details = (
+  competition: Json,
+  state: string,
+  teams: { home: TeamScore; away: TeamScore },
+): GameDetails => {
+  const result: GameDetails = {};
+  const situation = isObject(competition.situation)
+    ? competition.situation
+    : {};
+  const lastPlay = isObject(situation.lastPlay) ? situation.lastPlay : {};
+
+  const text = str(lastPlay.text)?.trim();
+  if (text) result.lastPlay = text;
+
+  if (isObject(lastPlay.probability)) {
+    const home = share(lastPlay.probability.homeWinPercentage);
+    const away = share(lastPlay.probability.awayWinPercentage);
+    if (home !== null && away !== null) result.winProbability = { home, away };
+  }
+
+  if (isObject(lastPlay.drive)) {
+    const drive = str(lastPlay.drive.description)?.trim();
+    if (drive) result.drive = drive;
+  }
+
+  const homeTimeouts = timeoutsLeft(situation.homeTimeouts);
+  const awayTimeouts = timeoutsLeft(situation.awayTimeouts);
+  if (homeTimeouts !== null && awayTimeouts !== null) {
+    result.timeouts = { home: homeTimeouts, away: awayTimeouts };
+  }
+
+  // Before kickoff ESPN's leaders are season totals, which next to a 0-0
+  // score would read as this game's.
+  if (state !== "pre") {
+    const found = leaders(competition.leaders, [teams.home, teams.away]);
+    if (found.length > 0) result.leaders = found;
+  }
+  return result;
 };
 
 const game = (event: unknown): GameScore | null => {
@@ -149,6 +252,10 @@ const game = (event: unknown): GameScore | null => {
     away: strip(away),
     ...(gameDown ? { down: gameDown } : {}),
     networks,
+    details: details(competition, state, {
+      home: strip(home),
+      away: strip(away),
+    }),
   };
 };
 

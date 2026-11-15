@@ -1,0 +1,310 @@
+{
+  "events": [
+    {
+      "id": "401873062",
+      "date": "2026-11-15T21:05Z",
+      "shortName": "SEA @ LV",
+      "status": {
+        "clock": 72.0,
+        "displayClock": "1:12",
+        "period": 1,
+        "type": {
+          "name": "STATUS_IN_PROGRESS",
+          "state": "in",
+          "completed": false,
+          "shortDetail": "1:12 - 1st"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "7",
+              "team": {
+                "id": "13",
+                "abbreviation": "LV",
+                "displayName": "Las Vegas Raiders",
+                "location": "Las Vegas",
+                "name": "Raiders"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "7",
+              "team": {
+                "id": "26",
+                "abbreviation": "SEA",
+                "displayName": "Seattle Seahawks",
+                "location": "Seattle",
+                "name": "Seahawks"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["CBS"]
+            }
+          ],
+          "leaders": [
+            {
+              "name": "passingYards",
+              "leaders": [
+                {
+                  "displayValue": "2/2, 43 YDS, 1 TD",
+                  "athlete": {
+                    "shortName": "D. Lock"
+                  },
+                  "team": {
+                    "id": "26"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rushingYards",
+              "leaders": [
+                {
+                  "displayValue": "6 CAR, 37 YDS",
+                  "athlete": {
+                    "shortName": "Z. Charbonnet"
+                  },
+                  "team": {
+                    "id": "26"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "receivingYards",
+              "leaders": [
+                {
+                  "displayValue": "1 REC, 34 YDS, 1 TD",
+                  "athlete": {
+                    "shortName": "C. Kupp"
+                  },
+                  "team": {
+                    "id": "26"
+                  }
+                }
+              ]
+            }
+          ],
+          "situation": {
+            "lastPlay": {
+              "text": " (Shotgun) M.Washington up the middle to SEA 46 for no gain (D.Fowler).",
+              "probability": {
+                "tiePercentage": 0.0,
+                "homeWinPercentage": 0.3173,
+                "awayWinPercentage": 0.6827,
+                "secondsLeft": 0
+              },
+              "drive": {
+                "description": "3 plays, 19 yards, 1:20"
+              }
+            },
+            "down": 3,
+            "yardLine": 54,
+            "distance": 4,
+            "downDistanceText": "3rd & 4 at SEA 46",
+            "shortDownDistanceText": "3rd & 4",
+            "possessionText": "SEA 46",
+            "isRedZone": false,
+            "homeTimeouts": 3,
+            "awayTimeouts": 3,
+            "possession": "13"
+          }
+        }
+      ]
+    },
+    {
+      "id": "401873064",
+      "date": "2026-11-16T01:20Z",
+      "shortName": "PIT @ CIN",
+      "status": {
+        "clock": 0.0,
+        "displayClock": "0:00",
+        "period": 0,
+        "type": {
+          "name": "STATUS_SCHEDULED",
+          "state": "pre",
+          "completed": false,
+          "shortDetail": "11/15 - 8:20 PM EST"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "0",
+              "team": {
+                "id": "4",
+                "abbreviation": "CIN",
+                "displayName": "Cincinnati Bengals",
+                "location": "Cincinnati",
+                "name": "Bengals"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "0",
+              "team": {
+                "id": "23",
+                "abbreviation": "PIT",
+                "displayName": "Pittsburgh Steelers",
+                "location": "Pittsburgh",
+                "name": "Steelers"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["NBC"]
+            }
+          ],
+          "leaders": [
+            {
+              "name": "passingYards",
+              "leaders": [
+                {
+                  "displayValue": "2386 YDS, 23 TD, 6 INT",
+                  "athlete": {
+                    "shortName": "J. Burrow"
+                  },
+                  "team": {
+                    "id": "4"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rushingYards",
+              "leaders": [
+                {
+                  "displayValue": "119 CAR, 704 YDS, 2 TD",
+                  "athlete": {
+                    "shortName": "J. Warren"
+                  },
+                  "team": {
+                    "id": "23"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "receivingYards",
+              "leaders": [
+                {
+                  "displayValue": "48 REC, 758 YDS, 6 TD",
+                  "athlete": {
+                    "shortName": "T. Higgins"
+                  },
+                  "team": {
+                    "id": "4"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "401873053",
+      "date": "2026-11-15T14:30Z",
+      "shortName": "NE VS DET",
+      "status": {
+        "clock": 0.0,
+        "displayClock": "0:00",
+        "period": 4,
+        "type": {
+          "name": "STATUS_FINAL",
+          "state": "post",
+          "completed": true,
+          "shortDetail": "Final"
+        }
+      },
+      "competitions": [
+        {
+          "competitors": [
+            {
+              "homeAway": "home",
+              "score": "35",
+              "team": {
+                "id": "8",
+                "abbreviation": "DET",
+                "displayName": "Detroit Lions",
+                "location": "Detroit",
+                "name": "Lions"
+              }
+            },
+            {
+              "homeAway": "away",
+              "score": "10",
+              "team": {
+                "id": "17",
+                "abbreviation": "NE",
+                "displayName": "New England Patriots",
+                "location": "New England",
+                "name": "Patriots"
+              }
+            }
+          ],
+          "broadcasts": [
+            {
+              "market": "national",
+              "names": ["Fox"]
+            }
+          ],
+          "leaders": [
+            {
+              "name": "passingYards",
+              "leaders": [
+                {
+                  "displayValue": "20/31, 303 YDS, 3 TD, 2 INT",
+                  "athlete": {
+                    "shortName": "J. Goff"
+                  },
+                  "team": {
+                    "id": "8"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rushingYards",
+              "leaders": [
+                {
+                  "displayValue": "22 CAR, 153 YDS, 2 TD",
+                  "athlete": {
+                    "shortName": "J. Gibbs"
+                  },
+                  "team": {
+                    "id": "8"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "receivingYards",
+              "leaders": [
+                {
+                  "displayValue": "7 REC, 99 YDS",
+                  "athlete": {
+                    "shortName": "J. Gibbs"
+                  },
+                  "team": {
+                    "id": "8"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,9 @@ describe("parseScoreboard", () => {
       },
       down: { text: "2nd & 9", possessionAbbr: "KC", redZone: false },
       networks: ["CBS"],
+      // This fixture was trimmed without the last play and leaders; the
+      // details fixture covers those.
+      details: { timeouts: { home: 3, away: 3 } },
     });
   });
 
