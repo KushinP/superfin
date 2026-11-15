@@ -14,6 +14,7 @@ import { atom, useAtom, useAtomValue, useStore } from "jotai";
 import { useCallback, useEffect } from "react";
 import { Platform } from "react-native";
 import { BITRATES, type Bitrate } from "@/components/BitrateSelector";
+import { LIVE_SCORES_DELAY_DEFAULT_S } from "@/constants/LiveScores";
 import {
   DEFAULT_MUSIC_NORMALIZATION_MODE,
   type MusicNormalizationMode,
@@ -428,6 +429,13 @@ export type Settings = {
   defaultBitrate?: Bitrate;
   /** The most one multiview tile streams at; see tileMaxBitrate. */
   multiviewMaxBitrate?: Bitrate;
+  /** Score bugs on live NFL multiview tiles; off means no score requests at all. */
+  liveScoresEnabled: boolean;
+  /**
+   * How far behind real time the score bugs run, in seconds, so they never
+   * show a play before the picture does. Read through clampDelaySeconds.
+   */
+  liveScoresDelaySeconds: number;
   libraryOptions: LibraryOptions;
   defaultAudioLanguage: CultureDto | null;
   playDefaultAudioTrack: boolean;
@@ -635,6 +643,8 @@ export const defaultValues: Settings = {
   downloadQuality: DownloadOptions[0],
   showDownloadLiveActivity: true,
   defaultBitrate: BITRATES[0],
+  liveScoresEnabled: true,
+  liveScoresDelaySeconds: LIVE_SCORES_DELAY_DEFAULT_S,
   libraryOptions: {
     display: "list",
     cardStyle: "detailed",
