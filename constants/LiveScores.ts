@@ -54,3 +54,23 @@ export const LIVE_SCORES_GUIDE_REFRESH_MS = 5 * 60 * 1000;
  * listing can lag the clock by a few seconds.
  */
 export const LIVE_SCORES_GUIDE_MIN_REFRESH_MS = 10 * 1000;
+
+/**
+ * The scores rail's height and its margin from the screen's edges and the
+ * tiles, in screen units. 36 + 2 × 8 fits the smallest black band two tiles
+ * leave on a TV (about 75, one tile enlarged).
+ */
+export const LIVE_SCORES_RAIL_HEIGHT = 36;
+export const LIVE_SCORES_RAIL_MARGIN = 8;
+
+/**
+ * How wide the rail reckons one game: a pinned one (tag, both scores, clock)
+ * and one of the others (teams and a short status), plus the gap between
+ * the two groups. Used to decide how many of the others fit on a page.
+ */
+export const LIVE_SCORES_RAIL_PINNED_WIDTH = 170;
+export const LIVE_SCORES_RAIL_CHIP_WIDTH = 120;
+export const LIVE_SCORES_RAIL_SEPARATOR_WIDTH = 16;
+
+/** How long the rail shows one page of the other games before the next. */
+export const LIVE_SCORES_RAIL_PAGE_MS = 8 * 1000;
