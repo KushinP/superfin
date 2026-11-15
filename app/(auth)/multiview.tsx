@@ -57,6 +57,7 @@ import {
   removeTile,
   setTileQuality,
   tapWhileToolbar,
+  tileDrawOrder,
   tileFrames,
   tilePlayerKey,
   toggleAllAudio,
@@ -293,6 +294,14 @@ function MultiviewScreen() {
     area.height,
   );
   const full = state.tiles.length >= MULTIVIEW_MAX_TILES;
+  // Tiles are drawn in a fixed order and only their frames follow the
+  // layout: on Android TV a re-ordered tile lost its player (tileDrawOrder).
+  const drawOrder = useRef<string[]>([]);
+  drawOrder.current = tileDrawOrder(drawOrder.current, state.tiles);
+  const tilesToDraw = drawOrder.current.flatMap((key) => {
+    const index = state.tiles.findIndex((tile) => tile.key === key);
+    return index === -1 ? [] : [{ tile: state.tiles[index], index }];
+  });
 
   return (
     <View className='flex-1 bg-black'>
@@ -306,7 +315,7 @@ function MultiviewScreen() {
           height: area.height,
         }}
       >
-        {state.tiles.map((tile, i) =>
+        {tilesToDraw.map(({ tile, index: i }) =>
           frames[i] ? (
             <MultiviewTile
               // The item and the reconnect count are part of the key: a tile

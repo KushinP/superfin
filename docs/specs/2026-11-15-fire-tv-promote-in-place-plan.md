@@ -83,3 +83,7 @@ Not applicable.
 ## 10. Risks and undo
 - **The draw order no longer matches the layout order.** Tiles don't overlap, so nothing visible changes. Screen readers would read the tiles in the order they were added.
 - **Undo:** revert the fix commit.
+
+## Changes
+- 2026-11-15: The screen test is `components/multiview/multiviewScreen.test.tsx`, not `app/(auth)/multiview.test.tsx`. Expo Router treats files under `app/` as screens, so a test there could become a route. Behavior unchanged.
+- 2026-11-15: Check 5 ("a promotion rebuilds no tile") already passed before the fix. React never remounted a promoted tile: the reconnect came from the native view being re-ordered, which checks 1-3 reproduce. It stays as a control.
