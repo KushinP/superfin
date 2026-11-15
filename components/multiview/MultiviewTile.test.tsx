@@ -97,6 +97,17 @@ jest.mock("@/hooks/useMultiviewTileStream", () => ({
     return mockStream;
   },
 }));
+/** The tile's TV remote key handler, as the TV event hook was given it. */
+let mockTVKeys:
+  | ((evt: { eventType: string; eventKeyAction?: number }) => void)
+  | undefined;
+jest.mock("@/hooks/useTVEventHandler", () => ({
+  useTVEventHandler: (
+    handler: (evt: { eventType: string; eventKeyAction?: number }) => void,
+  ) => {
+    mockTVKeys = handler;
+  },
+}));
 const mockWriteToLog = jest.fn();
 jest.mock("@/utils/log", () => ({
   writeToLog: (...args: unknown[]) => mockWriteToLog(...args),
@@ -174,6 +185,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockOnProgress = undefined;
   mockOnState = undefined;
+  mockTVKeys = undefined;
   mockSources = [];
   mockStream = undefined;
   mockItem = {
@@ -555,6 +567,86 @@ describe("the tile's own menu", () => {
   test("the button hides with the labels", async () => {
     await renderTile(false);
     expect(screen.queryByLabelText("multiview.tile_menu")).toBeNull();
+  });
+});
+
+describe("the TV remote's playback keys", () => {
+  // Reported on a Fire TV: play, pause, forward and rewind did nothing in
+  // multiview. The remote's keys never reached a tile, and its on-screen
+  // buttons sit inside the tile's own focus target, out of the D-pad's reach.
+  const press = async (eventType: string, eventKeyAction = 0) => {
+    await act(async () => mockTVKeys?.({ eventType, eventKeyAction }));
+  };
+  const focus = async () => {
+    await fireEvent(screen.getByTestId("multiview-tile-target"), "focus");
+  };
+
+  test("⏯ pauses the focused tile, and plays it once it is paused", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("playPause");
+    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+
+    await playerState({ isPaused: true });
+    await press("playPause");
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("⏪ goes back 10 seconds and ⏩ forward 30", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("rewind");
+    await press("fastForward");
+
+    expect(mockPlayer.seekBy.mock.calls).toEqual([[-10], [30]]);
+  });
+
+  test("the separate Play and Pause keys play and pause", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("pause");
+    await press("play");
+
+    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("a key counts once, on the press and not the release", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("rewind", 0);
+    await press("rewind", 1);
+
+    expect(mockPlayer.seekBy).toHaveBeenCalledTimes(1);
+  });
+
+  test("a tile without the focus ignores them", async () => {
+    await renderTile(false);
+    await focus();
+    await fireEvent(screen.getByTestId("multiview-tile-target"), "blur");
+
+    await press("playPause");
+    await press("fastForward");
+
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+    expect(mockPlayer.seekBy).not.toHaveBeenCalled();
+  });
+
+  test("a live channel ignores them: there is nothing to pause or skip", async () => {
+    mockItem = { Id: "chan-1", Name: "WBZ-DT", Type: "TvChannel" };
+    await renderTile(false);
+    await focus();
+
+    await press("playPause");
+    await press("rewind");
+
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+    expect(mockPlayer.seekBy).not.toHaveBeenCalled();
   });
 });
 
