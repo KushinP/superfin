@@ -27,7 +27,6 @@ import { MultiviewPicker } from "@/components/multiview/MultiviewPicker";
 import { MultiviewScoreLayer } from "@/components/multiview/MultiviewScoreLayer";
 import { MultiviewTile } from "@/components/multiview/MultiviewTile";
 import { useFocused } from "@/components/multiview/useFocused";
-import { useLiveScoresMenu } from "@/components/multiview/useLiveScoresMenu";
 import { useMultiviewQualityPicker } from "@/components/multiview/useMultiviewQualityPicker";
 import { MultiviewColors } from "@/constants/Colors";
 import {
@@ -39,6 +38,7 @@ import useRouter from "@/hooks/useAppRouter";
 import { useLiveScores } from "@/hooks/useLiveScores";
 import { useOrientation } from "@/hooks/useOrientation";
 import { useInvalidatePlaybackProgressCache } from "@/hooks/useRevalidatePlaybackProgressCache";
+import { useScoresScreen } from "@/hooks/useScoresScreen";
 import { useScreenKeyCommands } from "@/hooks/useScreenKeyCommands";
 import { useTVOptionModal } from "@/hooks/useTVOptionModal";
 import type { KeyCommand } from "@/modules/key-commands";
@@ -154,12 +154,14 @@ function MultiviewScreen() {
   const liveScores = useLiveScores(
     state.tiles.map((tile) => ({ key: tile.key, itemId: tile.itemId })),
   );
-  const scoresMenu = useLiveScoresMenu();
-  // A closed TV option sheet leaves Android TV with nothing focused (see the
-  // android-tv-modal-close-loses-focus fact), so the button that opened it
-  // takes the focus back once this screen is on top again.
+  const openScores = useScoresScreen();
+  // A closed TV option sheet or screen leaves Android TV with nothing
+  // focused (see the android-tv-modal-close-loses-focus fact), so the
+  // toolbar button that opened it takes the focus back once this screen is
+  // on top again.
   const qualityButton = useRef<View>(null);
-  const qualityOpened = useRef(false);
+  const scoresButton = useRef<View>(null);
+  const toolbarReturn = useRef<RefObject<View | null> | null>(null);
   // Likewise a tile's TV menu: the tile it was opened from takes the focus
   // back, or the main tile when that one was removed.
   const { showOptions } = useTVOptionModal();
@@ -183,14 +185,13 @@ function MultiviewScreen() {
         }, TV_FOCUS_RETURN_DELAY);
         return () => clearTimeout(timer);
       }
-      if (!qualityOpened.current) return;
-      qualityOpened.current = false;
+      const button = toolbarReturn.current;
+      if (!button) return;
+      toolbarReturn.current = null;
       const timer = setTimeout(
         () =>
           (
-            qualityButton.current as
-              | (View & { requestTVFocus?: () => void })
-              | null
+            button.current as (View & { requestTVFocus?: () => void }) | null
           )?.requestTVFocus?.(),
         TV_FOCUS_RETURN_DELAY,
       );
@@ -274,8 +275,11 @@ function MultiviewScreen() {
   stateRef.current = state;
   const statsRef = useRef(statsTiles);
   statsRef.current = statsTiles;
-  const scoresMenuRef = useRef(scoresMenu);
-  scoresMenuRef.current = scoresMenu;
+  const openScoresRef = useRef(openScores);
+  openScoresRef.current = openScores;
+  // Scores are offered only while a tile shows football (R10).
+  const hasScoresRef = useRef(false);
+  hasScoresRef.current = liveScores.view !== null;
 
   /** What a tile's menu does, the same from the TV menu and the action sheet. */
   const runTileAction = useCallback(
@@ -302,7 +306,7 @@ function MultiviewScreen() {
       if (action === "scores") {
         // Its own TV menu closes too: the focus comes back to this tile.
         tileMenuKey.current = key;
-        scoresMenuRef.current.open();
+        openScoresRef.current();
       }
       if (action === "remove") setState((s) => removeTile(s, key));
     },
@@ -342,11 +346,15 @@ function MultiviewScreen() {
               value: "reconnect",
               selected: false,
             },
-            {
-              label: scoresMenuRef.current.label,
-              value: "scores",
-              selected: false,
-            },
+            ...(hasScoresRef.current
+              ? [
+                  {
+                    label: t("livescores.open_scores"),
+                    value: "scores" as const,
+                    selected: false,
+                  },
+                ]
+              : []),
             {
               label: t("multiview.remove_tile"),
               value: "remove",
@@ -360,29 +368,28 @@ function MultiviewScreen() {
         });
         return;
       }
-      // Make main, Quality, Stats, Reconnect, Live scores, Remove, Cancel.
-      const actions: TileAction[] = [
-        "main",
-        "quality",
-        "stats",
-        "reconnect",
-        "scores",
-        "remove",
+      // Make main, Quality, Stats, Reconnect, Scores (with football on),
+      // Remove, Cancel.
+      const items: [TileAction, string][] = [
+        ["main", t("multiview.make_main")],
+        ["quality", t("multiview.tile_quality", { quality: tileQuality })],
+        [
+          "stats",
+          statsOn ? t("multiview.stats_hide") : t("multiview.stats_show"),
+        ],
+        ["reconnect", t("multiview.reconnect")],
+        ...(hasScoresRef.current
+          ? [["scores", t("livescores.open_scores")] as [TileAction, string]]
+          : []),
+        ["remove", t("multiview.remove_tile")],
       ];
-      const options = [
-        t("multiview.make_main"),
-        t("multiview.tile_quality", { quality: tileQuality }),
-        statsOn ? t("multiview.stats_hide") : t("multiview.stats_show"),
-        t("multiview.reconnect"),
-        scoresMenuRef.current.label,
-        t("multiview.remove_tile"),
-        t("common.cancel"),
-      ];
+      const actions = items.map(([action]) => action);
+      const options = [...items.map(([, label]) => label), t("common.cancel")];
       showActionSheetWithOptions(
         {
           options,
-          destructiveButtonIndex: 5,
-          cancelButtonIndex: 6,
+          destructiveButtonIndex: actions.indexOf("remove"),
+          cancelButtonIndex: options.length - 1,
         },
         (index) => {
           const action = index === undefined ? undefined : actions[index];
@@ -520,6 +527,20 @@ function MultiviewScreen() {
             disabled={state.tiles.length < 2}
             onPress={() => setState(toggleLayout)}
           />
+          {liveScores.view && (
+            <ToolbarButton
+              buttonRef={scoresButton}
+              onFocusChange={setToolbarFocused}
+              nextFocusDown={firstTileHandle ?? undefined}
+              icon='american-football-outline'
+              label={t("livescores.open_scores")}
+              onPress={() => {
+                toolbarReturn.current = scoresButton;
+                setLastTouch(Date.now());
+                openScores();
+              }}
+            />
+          )}
           <ToolbarButton
             onFocusChange={setToolbarFocused}
             nextFocusDown={firstTileHandle ?? undefined}
@@ -540,7 +561,7 @@ function MultiviewScreen() {
             label={t("multiview.quality", { quality: quality.quality })}
             disabled={quality.locked}
             onPress={() => {
-              qualityOpened.current = true;
+              toolbarReturn.current = qualityButton;
               setLastTouch(Date.now());
               // A quality for all tiles replaces the ones set per tile.
               quality.openShared(() => setState(clearTileQualities));

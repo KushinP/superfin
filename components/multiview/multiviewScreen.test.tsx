@@ -127,16 +127,18 @@ jest.mock("@/hooks/useScreenKeyCommands", () => ({
 jest.mock("@/packages/expo-screen-orientation", () => ({
   OrientationLock: { LANDSCAPE: 6 },
 }));
-// Live scores are tested in multiviewScores.test.tsx; here they stand aside.
+// Live scores are tested in multiviewScores.test.tsx; here they stand aside,
+// with football on screen so the tile menu has its Scores item.
 const mockOpenScores = jest.fn();
 jest.mock("@/hooks/useLiveScores", () => ({
-  useLiveScores: () => ({ tiles: new Map(), games: [] }),
-}));
-jest.mock("@/components/multiview/useLiveScoresMenu", () => ({
-  useLiveScoresMenu: () => ({
-    label: "livescores.menu_delay",
-    open: mockOpenScores,
+  useLiveScores: () => ({
+    tiles: new Map(),
+    games: [],
+    view: { status: "ok", pinned: [], others: [], delaySeconds: 30 },
   }),
+}));
+jest.mock("@/hooks/useScoresScreen", () => ({
+  useScoresScreen: () => mockOpenScores,
 }));
 jest.mock("@/utils/multiview/availability", () => ({
   isMultiviewAvailable: () => true,
@@ -163,7 +165,7 @@ const isBig = (itemId: string) => {
 
 const MAKE_MAIN = 0;
 const RECONNECT = 3;
-// Live scores sits between Reconnect and Remove.
+// Scores sits between Reconnect and Remove.
 const REMOVE = 5;
 
 /** Long-presses a tile and picks a menu option. */
@@ -316,7 +318,7 @@ describe("a tile's menu on TV", () => {
         "multiview.stats_quality_tile",
         "multiview.stats_show",
         "multiview.reconnect",
-        "livescores.menu_delay",
+        "livescores.open_scores",
         "multiview.remove_tile",
       ]);
       expect(mockTVMenus[0].options[1].sublabel).toBe("8 Mb/s");
@@ -377,7 +379,7 @@ describe("a tile's menu on TV", () => {
     });
   });
 
-  test("Live scores opens the scores menu", async () => {
+  test("Scores opens the scores screen", async () => {
     await onTV(async () => {
       await render(<MultiviewRoute />);
 
