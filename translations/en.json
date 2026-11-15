@@ -1575,6 +1575,15 @@
     "delay_message": "Scores show {{seconds}} seconds behind real time, so they don't give away a play before you see it. If a score arrives before the play, show scores later.",
     "settings_enabled": "Live scores on multiview tiles",
     "settings_delay": "Score delay",
-    "settings_delay_value": "{{seconds}} s"
+    "settings_delay_value": "{{seconds}} s",
+    "delay_status": "Your games show {{seconds}} s behind live",
+    "waiting": "The score shows {{seconds}} s behind live, in a moment.",
+    "last_play": "Last play: {{text}}",
+    "win_probability": "Chance to win: {{away}} {{awayPct}}%, {{home}} {{homePct}}%",
+    "drive": "This drive: {{drive}}",
+    "timeouts": "Timeouts left: {{away}} {{awayCount}}, {{home}} {{homeCount}}",
+    "leader_passing": "Passing: {{name}}, {{line}}",
+    "leader_rushing": "Rushing: {{name}}, {{line}}",
+    "leader_receiving": "Receiving: {{name}}, {{line}}"
   }
 }
