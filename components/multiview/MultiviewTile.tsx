@@ -52,7 +52,8 @@ interface Props {
    */
   showLabel: boolean;
   onPress: () => void;
-  onLongPress: () => void;
+  /** Opens the tile's menu, with the item's name once it is known. */
+  onLongPress: (name?: string) => void;
   /** A playback control was used; keeps the toolbar and controls up. */
   onInteract?: () => void;
   /** Plays this item in the tile's place: the next episode, once one ends. */
@@ -70,6 +71,11 @@ interface Props {
   nextFocusUp?: number;
   /** The tile's focusable view, for the toolbar's Down to come back to. */
   onTargetRef?: (handle: number | null) => void;
+  /**
+   * Each new value moves the TV focus to this tile: a closed TV menu leaves
+   * Android TV with nothing focused (android-tv-modal-close-loses-focus).
+   */
+  focusRequest?: number;
   /** This tile's own quality cap; unset, it follows the shared setting. */
   quality?: TileQuality;
   /** The cap in force, own or shared, for the stats overlay. */
@@ -105,6 +111,7 @@ export function MultiviewTile({
   hasTVPreferredFocus,
   nextFocusUp,
   onTargetRef,
+  focusRequest,
   quality,
   qualityKey,
   showStats,
@@ -165,6 +172,14 @@ export function MultiviewTile({
   useEffect(() => {
     void playerRef.current?.setMute(muted);
   }, [muted]);
+
+  const target = useRef<View>(null);
+  useEffect(() => {
+    if (focusRequest === undefined) return;
+    (
+      target.current as (View & { requestTVFocus?: () => void }) | null
+    )?.requestTVFocus?.();
+  }, [focusRequest]);
 
   // Free the decoder as soon as the tile goes, not when the view is collected:
   // with several players up, the next tile may need that memory right away.
@@ -405,15 +420,20 @@ export function MultiviewTile({
       {/* Above the native view, which would otherwise take the touches. */}
       <Pressable
         testID='multiview-tile-target'
-        ref={
-          onTargetRef
-            ? (view) => onTargetRef(view ? findNodeHandle(view) : null)
-            : undefined
-        }
+        ref={(view) => {
+          target.current = view;
+          onTargetRef?.(view ? findNodeHandle(view) : null);
+        }}
         nextFocusUp={nextFocusUp}
         style={StyleSheet.absoluteFill}
         onPress={onPress}
-        onLongPress={onLongPress}
+        onLongPress={() =>
+          onLongPress(
+            state.status === "ready"
+              ? (state.item.Name ?? undefined)
+              : undefined,
+          )
+        }
         onFocus={onFocus}
         onBlur={onBlur}
         hasTVPreferredFocus={hasTVPreferredFocus}
@@ -447,7 +467,7 @@ export function MultiviewTile({
       {showLabel && !Platform.isTV && (
         <Pressable
           testID='multiview-tile-menu'
-          onPress={onLongPress}
+          onPress={() => onLongPress()}
           hitSlop={6}
           accessibilityRole='button'
           accessibilityLabel={t("multiview.tile_menu")}
