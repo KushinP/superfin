@@ -37,6 +37,7 @@ import useRouter from "@/hooks/useAppRouter";
 import { useOrientation } from "@/hooks/useOrientation";
 import { useInvalidatePlaybackProgressCache } from "@/hooks/useRevalidatePlaybackProgressCache";
 import { useScreenKeyCommands } from "@/hooks/useScreenKeyCommands";
+import { useTVOptionModal } from "@/hooks/useTVOptionModal";
 import type { KeyCommand } from "@/modules/key-commands";
 import { OrientationLock } from "@/packages/expo-screen-orientation";
 import { isMultiviewAvailable } from "@/utils/multiview/availability";
@@ -65,6 +66,9 @@ import {
 } from "@/utils/multiview/multiview";
 
 const KEEP_AWAKE_TAG = "multiview";
+
+/** What a tile's menu can do. */
+type TileAction = "main" | "quality" | "stats" | "reconnect" | "remove";
 
 /**
  * How long, in ms, after the TV quality sheet closes before the quality button
@@ -142,9 +146,30 @@ function MultiviewScreen() {
   // takes the focus back once this screen is on top again.
   const qualityButton = useRef<View>(null);
   const qualityOpened = useRef(false);
+  // Likewise a tile's TV menu: the tile it was opened from takes the focus
+  // back, or the main tile when that one was removed.
+  const { showOptions } = useTVOptionModal();
+  const tileMenuKey = useRef<string | null>(null);
+  const [tileFocus, setTileFocus] = useState<{ key: string; count: number }>();
   useFocusEffect(
     useCallback(() => {
-      if (!Platform.isTV || !qualityOpened.current) return;
+      if (!Platform.isTV) return;
+      if (tileMenuKey.current) {
+        const key = tileMenuKey.current;
+        tileMenuKey.current = null;
+        const timer = setTimeout(() => {
+          const tiles = stateRef.current.tiles;
+          const target = tiles.some((t) => t.key === key) ? key : tiles[0]?.key;
+          if (target) {
+            setTileFocus((current) => ({
+              key: target,
+              count: (current?.count ?? 0) + 1,
+            }));
+          }
+        }, TV_FOCUS_RETURN_DELAY);
+        return () => clearTimeout(timer);
+      }
+      if (!qualityOpened.current) return;
       qualityOpened.current = false;
       const timer = setTimeout(
         () =>
@@ -236,17 +261,90 @@ function MultiviewScreen() {
   const statsRef = useRef(statsTiles);
   statsRef.current = statsTiles;
 
+  /** What a tile's menu does, the same from the TV menu and the action sheet. */
+  const runTileAction = useCallback(
+    (key: string, action: TileAction) => {
+      const tile = stateRef.current.tiles.find((t) => t.key === key);
+      if (!tile) return;
+      if (action === "main") setState((s) => promoteTile(s, key));
+      if (action === "quality") {
+        // Its own TV menu closes too: the focus comes back to this tile.
+        tileMenuKey.current = key;
+        quality.openTile(tile.quality, (next) =>
+          setState((s) => setTileQuality(s, key, next)),
+        );
+      }
+      if (action === "stats") {
+        setStatsTiles((current) => {
+          const next = new Set(current);
+          if (current.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+      }
+      if (action === "reconnect") setState((s) => reconnectTile(s, key));
+      if (action === "remove") setState((s) => removeTile(s, key));
+    },
+    [quality],
+  );
+
   const onTileLongPress = useCallback(
-    (key: string) => {
+    (key: string, name?: string) => {
       const tile = stateRef.current.tiles.find((t) => t.key === key);
       if (!tile) return;
       const statsOn = statsRef.current.has(key);
+      const tileQuality = tile.quality?.key ?? quality.quality;
+      if (Platform.isTV) {
+        // The app's TV menu, not the phone action sheet: on a Fire TV that
+        // was a white panel over most of the screen, with no title and no
+        // visible focus.
+        tileMenuKey.current = key;
+        showOptions<TileAction>({
+          title: name ?? t("multiview.tile_menu"),
+          options: [
+            { label: t("multiview.make_main"), value: "main", selected: false },
+            {
+              label: t("multiview.stats_quality_tile"),
+              sublabel: tileQuality,
+              value: "quality",
+              selected: false,
+            },
+            {
+              label: statsOn
+                ? t("multiview.stats_hide")
+                : t("multiview.stats_show"),
+              value: "stats",
+              selected: false,
+            },
+            {
+              label: t("multiview.reconnect"),
+              value: "reconnect",
+              selected: false,
+            },
+            {
+              label: t("multiview.remove_tile"),
+              value: "remove",
+              selected: false,
+            },
+          ],
+          onSelect: (action) => runTileAction(key, action),
+          // Quality opens a second TV menu, which this one's route would
+          // otherwise swallow.
+          deferApplyUntilDismissed: true,
+        });
+        return;
+      }
       // Make main, Quality, Stats, Reconnect, Remove, Cancel.
+      const actions: TileAction[] = [
+        "main",
+        "quality",
+        "stats",
+        "reconnect",
+        "remove",
+      ];
       const options = [
         t("multiview.make_main"),
-        t("multiview.tile_quality", {
-          quality: tile.quality?.key ?? quality.quality,
-        }),
+        t("multiview.tile_quality", { quality: tileQuality }),
         statsOn ? t("multiview.stats_hide") : t("multiview.stats_show"),
         t("multiview.reconnect"),
         t("multiview.remove_tile"),
@@ -259,26 +357,12 @@ function MultiviewScreen() {
           cancelButtonIndex: 5,
         },
         (index) => {
-          if (index === 0) setState((s) => promoteTile(s, key));
-          if (index === 1) {
-            quality.openTile(tile.quality, (next) =>
-              setState((s) => setTileQuality(s, key, next)),
-            );
-          }
-          if (index === 2) {
-            setStatsTiles((current) => {
-              const next = new Set(current);
-              if (statsOn) next.delete(key);
-              else next.add(key);
-              return next;
-            });
-          }
-          if (index === 3) setState((s) => reconnectTile(s, key));
-          if (index === 4) setState((s) => removeTile(s, key));
+          const action = index === undefined ? undefined : actions[index];
+          if (action) runTileAction(key, action);
         },
       );
     },
-    [showActionSheetWithOptions, t, quality],
+    [showActionSheetWithOptions, showOptions, t, quality, runTileAction],
   );
 
   const area = {
@@ -328,7 +412,10 @@ function MultiviewScreen() {
               heard={state.audio === tile.key && state.tiles.length > 1}
               showLabel={toolbarVisible}
               onPress={() => onTilePress(tile.key)}
-              onLongPress={() => onTileLongPress(tile.key)}
+              onLongPress={(name) => onTileLongPress(tile.key, name)}
+              focusRequest={
+                tileFocus?.key === tile.key ? tileFocus.count : undefined
+              }
               onInteract={onTileInteract}
               onPlayNext={(itemId) =>
                 setState((s) => playNext(s, tile.key, itemId))
