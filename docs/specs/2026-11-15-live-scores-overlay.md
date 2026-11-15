@@ -1,6 +1,7 @@
 # Live scores overlay and fantasy players: product spec
 
-Status: Approved (Gate 1)
+Status: Approved (Gates 1 and 2)
+Technical plan: `docs/specs/2026-11-15-live-scores-overlay-plan.md`
 Date: 2026-11-15
 Branch: `kush/live-scores-overlay`
 
@@ -65,17 +66,17 @@ Most important first.
 
 - **P0-1 Match a tile to a game.** For each live TV tile in multiview, use the channel's current guide (EPG) program title and the channel name to find today's NFL game. A match needs both teams named in the title (for example "NFL Football: Bills at Chiefs") or a single NFL game on that channel's network in that time slot. If two games could match, or none, show nothing.
 - **P0-2 Score bug on the tile.** Small, readable at quarter-tile size on a TV: both team abbreviations, scores, quarter, game clock, and down and distance with possession when the ball is live. Shows halftime, end of quarter and "Final". Stays visible when the toolbar hides (unlike the name label), and doesn't cover the center of the picture.
-- **P0-3 Spoiler delay.** Everything the bug shows is what the data said *delay seconds ago*, not now. Default 30 s, range 0–90 s, in 5 s steps. One setting for all tiles (all come from the same tuner and transcode path, so lag is similar).
+- **P0-3 Spoiler delay.** Everything the bug shows is what the data said *delay seconds ago*, not now. Default 30 s, range 0–90 s, in 5 s steps. One setting for all tiles (all come from the same tuner and transcode path, so lag is similar). A tile shows no bug until the delay has passed since multiview opened, so opening mid-game never flashes a live score.
 - **P0-4 Adjust delay from the remote.** In the tile's hold menu (next to Make main, Quality, Stats), add "Score delay +5 s / −5 s" showing the current value. Also in Settings, TV and mobile.
 - **P0-5 On/off.** A setting "Show live scores on tiles", default on. Off means no polling at all.
 - **P0-6 Poll once, share it.** One scoreboard fetch serves every tile on the device, no matter how many tiles show games. Polls only while multiview is open and at least one tile is matched or being matched. No polling when no NFL game is live. Nothing new runs on the Jellyfin server.
-- **P0-7 Fail quietly.** Any data problem (network down, unexpected format, ESPN changes its unofficial feed) hides the bug. No popups during a game. The tile's Stats overlay says "Scores unavailable" with the reason.
+- **P0-7 Fail quietly.** Any data problem (network down, unexpected format, ESPN changes its unofficial feed) hides the bug. No popups during a game. When the tile's Stats are turned on, it shows "Scores unavailable" with the reason.
 - **P0-8 Doesn't disturb playback.** Showing, updating or hiding the bug never reconnects, restarts or re-renders the video player.
 
 ### P1: fast follow (feature 2, fantasy)
 
-- **P1-1 Connect ESPN fantasy.** Kush's league id and team are settings. His private-league cookies (`espn_s2`, `SWID`) are secrets: they live only in `.env`, never in the app's code, logs, git or the shipped app bundle. (Where they're read from is an open question below.)
-- **P1-2 "My players in this game" panel.** When a tile's game has any of Kush's rostered starters (and optionally bench), the tile menu or an expanded overlay lists them with their stat line (for example "J. Allen: 2 pass TD, 1 rush TD").
+- **P1-1 Connect ESPN fantasy.** Kush's league id, team and private-league cookies (`espn_s2`, `SWID`) are set in the roster service's `.env` on the Ubuntu box. The cookies never appear in the app's code, logs, git or the shipped app bundle. The app's only fantasy setting is the service's address.
+- **P1-2 "My players in this game" line.** When a tile's game has any of Kush's rostered starters (and optionally bench), a single line under the score bug gives their stat line (for example "J. Allen: 2 pass TD, 1 rush TD").
 - **P1-3 Scoring toast.** When one of his players scores, show a TV toast ("Josh Allen: rushing TD, BUF 21–17") using the existing toast, after the same spoiler delay. One toast per scoring play, even if the data is fetched several times.
 - **P1-4 Fantasy failure.** Expired or wrong cookies: one toast per session ("ESPN fantasy sign-in expired: update your cookies") and the panel hides. The score bug is unaffected.
 - **P1-5 Manual game pick.** From the tile menu, "Choose game…" lists today's live NFL games; picking one overrides the automatic match for that tile until the program changes.
@@ -101,7 +102,7 @@ Most important first.
 | A2 spoiler delay | Delay is 30 s and the data changes to BUF 21 at 1:00:00 | Time is 1:00:29 / 1:00:30 | At :29 the bug still shows 14; at :30 it shows 21 | automated (fake clock) |
 | A3 edge: not a game | A tile shows "Local News at 6" | Multiview is open | No score bug, and no scoreboard poll if no other tile matched | automated |
 | A4 edge: ambiguous | The title is just "NFL Football" and two games are live on that network's slot | Matching runs | No bug is shown (no guessing) | automated |
-| A5 edge: program change | A matched game ends and the guide moves to "60 Minutes" | The next guide refresh | The bug shows "Final" until the program changes, then disappears | automated |
+| A5 edge: program change | A matched game ends and the guide moves to "60 Minutes" | The next guide refresh | The bug stays on its game until the game is final *and* the guide has moved on (so a game overrunning its slot keeps its bug), then disappears | automated |
 | A6 edge: delay change | Delay is 30 s | Kush picks "+5 s" from the tile menu | The setting is 35 s, the menu shows 35 s, and the bug's lag changes without the video reconnecting | automated + by hand |
 | A7 edge: one poll | 4 tiles each show a different live NFL game | 2 minutes pass | Scoreboard fetches happen once per poll interval in total, not once per tile | automated (count fetches) |
 | A8 failure | The scoreboard request fails or returns an unexpected shape | Polling runs | Bugs hide, no popup, Stats shows "Scores unavailable", the video keeps playing; bugs come back when data is good again | automated |
@@ -127,3 +128,12 @@ Only ones that change the plan. Each has a default so work can continue.
 - **Server box pressure** if the fantasy service (open question 1) runs there. Mitigation: P1 only, sized in Gate 2, easy to turn off.
 - **ESPN cookies expire** every so often. Mitigation: one clear message (P1-4).
 - **Touching multiview** while another session changes tile ordering on `kush/fire-tv-promote-in-place`. This feature only adds an overlay inside the tile and must not change render order or keys (A11).
+
+## Changes
+
+- 2026-11-15, Gate 2 consistency pass: league id and team moved from app settings to the roster service's `.env` (P1-1), because the app never holds fantasy secrets.
+- 2026-11-15: "Scores unavailable" is shown when the tile's Stats are on, drawn by the score layer rather than inside the Stats overlay (P0-7). Same visible result.
+- 2026-11-15: A5 refined. The bug stays until the game is final and the guide has moved on, to handle games that overrun their guide slot.
+- 2026-11-15: P0-3 adds that no bug shows until the delay has passed since multiview opened, so a mid-game open can't spoil.
+- 2026-11-15: P1-2 is a single stat line under the bug, not a separate panel.
+- 2026-11-15: Open question 3 resolved. Channel → network mapping is an optional setting (plan slice 6, cut first).
