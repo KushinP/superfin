@@ -206,3 +206,12 @@ Checked:
 - no stored data is added;
 - the no-request control (R10) holds, because the details come from the same fetch;
 - the rail stays display-only, matching the non-goal of no remote focus.
+
+## Changes
+
+- 2026-11-15, slice 4: v1's status words moved to `components/multiview/gameStatusText.ts`, shared by the rail chips and the scores panel, instead of keeping `ScoreBug.tsx` as the chip. `ScoreBug` and its tests are removed.
+- 2026-11-15, slice 4: with no trustworthy data, the rail shows the specific reason ("Scores unavailable: ESPN can't be reached"), the same words the scores screen uses.
+- 2026-11-15, slice 6: the toolbar's focus return after a TV sheet closes is shared by the quality and Scores buttons (`toolbarReturn`), instead of a second copy of the quality button's flag.
+- 2026-11-15, slice 6: the tile menu's Scores item, like the toolbar button, shows only while a tile shows football (R10).
+- 2026-11-15, test-gate: `components/multiview/tvScoresModal.test.tsx` added for R5's "Back closes it" on TV.
+- Left for later: `useLiveScores` still returns v1's per-tile `tiles`, now unused on screen; ESPN's "0 plays, 0 yards, 0:00" drive right after a kickoff is shown as is.
