@@ -24,8 +24,10 @@ import { SystemBars } from "react-native-edge-to-edge";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/common/Text";
 import { MultiviewPicker } from "@/components/multiview/MultiviewPicker";
+import { MultiviewScoreLayer } from "@/components/multiview/MultiviewScoreLayer";
 import { MultiviewTile } from "@/components/multiview/MultiviewTile";
 import { useFocused } from "@/components/multiview/useFocused";
+import { useLiveScoresMenu } from "@/components/multiview/useLiveScoresMenu";
 import { useMultiviewQualityPicker } from "@/components/multiview/useMultiviewQualityPicker";
 import { MultiviewColors } from "@/constants/Colors";
 import {
@@ -34,6 +36,7 @@ import {
   MULTIVIEW_TV_TOOLBAR_BUTTON,
 } from "@/constants/Multiview";
 import useRouter from "@/hooks/useAppRouter";
+import { useLiveScores } from "@/hooks/useLiveScores";
 import { useOrientation } from "@/hooks/useOrientation";
 import { useInvalidatePlaybackProgressCache } from "@/hooks/useRevalidatePlaybackProgressCache";
 import { useScreenKeyCommands } from "@/hooks/useScreenKeyCommands";
@@ -136,6 +139,11 @@ function MultiviewScreen() {
   );
 
   const quality = useMultiviewQualityPicker();
+  // One scores poller for the whole screen, however many tiles show games.
+  const liveScores = useLiveScores(
+    state.tiles.map((tile) => ({ key: tile.key, itemId: tile.itemId })),
+  );
+  const scoresMenu = useLiveScoresMenu();
   // A closed TV option sheet leaves Android TV with nothing focused (see the
   // android-tv-modal-close-loses-focus fact), so the button that opened it
   // takes the focus back once this screen is on top again.
@@ -234,13 +242,15 @@ function MultiviewScreen() {
   stateRef.current = state;
   const statsRef = useRef(statsTiles);
   statsRef.current = statsTiles;
+  const scoresMenuRef = useRef(scoresMenu);
+  scoresMenuRef.current = scoresMenu;
 
   const onTileLongPress = useCallback(
     (key: string) => {
       const tile = stateRef.current.tiles.find((t) => t.key === key);
       if (!tile) return;
       const statsOn = statsRef.current.has(key);
-      // Make main, Quality, Stats, Reconnect, Remove, Cancel.
+      // Make main, Quality, Stats, Reconnect, Live scores, Remove, Cancel.
       const options = [
         t("multiview.make_main"),
         t("multiview.tile_quality", {
@@ -248,14 +258,15 @@ function MultiviewScreen() {
         }),
         statsOn ? t("multiview.stats_hide") : t("multiview.stats_show"),
         t("multiview.reconnect"),
+        scoresMenuRef.current.label,
         t("multiview.remove_tile"),
         t("common.cancel"),
       ];
       showActionSheetWithOptions(
         {
           options,
-          destructiveButtonIndex: 4,
-          cancelButtonIndex: 5,
+          destructiveButtonIndex: 5,
+          cancelButtonIndex: 6,
         },
         (index) => {
           if (index === 0) setState((s) => promoteTile(s, key));
@@ -273,7 +284,8 @@ function MultiviewScreen() {
             });
           }
           if (index === 3) setState((s) => reconnectTile(s, key));
-          if (index === 4) setState((s) => removeTile(s, key));
+          if (index === 4) scoresMenuRef.current.open();
+          if (index === 5) setState((s) => removeTile(s, key));
         },
       );
     },
@@ -293,6 +305,9 @@ function MultiviewScreen() {
     area.height,
   );
   const full = state.tiles.length >= MULTIVIEW_MAX_TILES;
+  const scoreSlots = state.tiles.flatMap((tile, i) =>
+    frames[i] ? [{ key: tile.key, frame: frames[i] }] : [],
+  );
 
   return (
     <View className='flex-1 bg-black'>
@@ -339,6 +354,25 @@ function MultiviewScreen() {
             />
           ) : null,
         )}
+      </View>
+
+      {/* Its own layer over the tiles, not inside them: a score changing
+          never re-renders a tile's player. Below the toolbar. */}
+      <View
+        pointerEvents='none'
+        style={{
+          position: "absolute",
+          left: area.left,
+          top: area.top,
+          width: area.width,
+          height: area.height,
+        }}
+      >
+        <MultiviewScoreLayer
+          tiles={scoreSlots}
+          scores={liveScores.tiles}
+          statsTiles={statsTiles}
+        />
       </View>
 
       {state.tiles.length === 0 && !pickerOpen && (
