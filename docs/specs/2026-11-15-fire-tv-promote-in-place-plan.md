@@ -87,3 +87,47 @@ Not applicable.
 ## Changes
 - 2026-11-15: The screen test is `components/multiview/multiviewScreen.test.tsx`, not `app/(auth)/multiview.test.tsx`. Expo Router treats files under `app/` as screens, so a test there could become a route. Behavior unchanged.
 - 2026-11-15: Check 5 ("a promotion rebuilds no tile") already passed before the fix. React never remounted a promoted tile: the reconnect came from the native view being re-ordered, which checks 1-3 reproduce. It stays as a control.
+- **2026-11-15, addendum (approved by Kush: "approve"): native lifecycle fix.** This replaces decision 1A's "no native change". The device test shows the long-press menu alone takes the tile views off the window, and the player is released then.
+  - **Decision.**
+    - `ExoPlayerView.onDetachedFromWindow()` stops calling `destroy()`. A detached view keeps its player. When the view is put back, PlayerView rebinds the video surface on its own. A TextureView or SurfaceView gets a new surface, and Media3's listener sets it on the player.
+    - `ExoPlayerModule`'s View gets `OnViewDestroys { view -> view.destroy() }`, as `HeroCarouselModule.kt` already does. Expo calls it when React removes the view for good.
+    - `destroy()` is already safe to call twice: `player?.release()` then `player = null`.
+  - **Release paths that remain.**
+    1. JS `destroy()` on tile unmount (`MultiviewTile.tsx:170`) and on every full-screen player exit (`direct-player.tsx`).
+    2. `OnViewDestroys`.
+  - **Alternative.** Rebuild the player in `onAttachedToWindow` from the saved config. Rejected: it still drops the stream, and the server would see a new session.
+  - **Files.**
+    - `modules/exoplayer-player/android/src/main/java/expo/modules/exoplayerplayer/ExoPlayerView.kt`: the detach handler and a comment.
+    - `ExoPlayerModule.kt`: `OnViewDestroys`.
+    - `.claude/learned-facts/` plus its index line in `CLAUDE.md`: a fact recording that ExoPlayerView must not release on detach.
+  - **Risk.**
+    - A player whose view is detached while its screen stays mounted (for example covered by a pushed screen) now keeps playing instead of being released, as MPV on iOS already does.
+    - A JS path that forgets `destroy()` and an Expo build that skips `OnViewDestroys` would both have to fail for a player to leak.
+  - **Tests.**
+    - Not coverable in Jest (native lifecycle).
+    - CI compiles the Kotlin. There is no Android SDK on this Mac.
+    - The proof is checks 9-11 on the Fire TV, run by the fork session, with the logcat pass rule: no `ExoPlayerImpl: Release` at a long-press, and no new `master.m3u8`.
+  - **Undo.** Revert the commit. Reinstalling the backed-up APK (`~/superfin-fire-tv-backup/base.apk`) rolls back the device.
+- **2026-11-15, addendum 2 (approved by Kush: "approve"): TV tile menu.**
+  - **Decision.**
+    - In `app/(auth)/multiview.tsx`, `onTileLongPress` calls `showOptions` from `useTVOptionModal` when `Platform.isTV`, and keeps `showActionSheetWithOptions` elsewhere.
+    - Each option's value is the action, and one `runTileAction(key, action)` serves both paths, so they cannot drift apart.
+    - The title is the tile's item name, passed up from `MultiviewTile` with the long-press (`onLongPress(name)`), falling back to "Tile options".
+    - Quality opens a second TV menu, so the first is dismissed first (`deferApplyUntilDismissed: true`, the documented case of an onSelect that navigates).
+    - On return, focus goes back to the long-pressed tile with `requestTVFocus()`, as the screen already does for the quality button (`android-tv-modal-close-loses-focus`).
+  - **Alternative.** An absolutely positioned panel over the tile. Rejected by the repo's TV rules (Back handling).
+  - **Files.**
+    - `app/(auth)/multiview.tsx`.
+    - `components/multiview/MultiviewTile.tsx`: passes its name with the long-press.
+    - `translations/en.json`: one new key, "Tile options", if no existing key says it.
+    - `components/multiview/multiviewScreen.test.tsx`.
+  - **Tests.** In `multiviewScreen.test.tsx`, with `useTVOptionModal` mocked:
+    - check 12: TV opens the TV menu with the tile's name and not the action sheet;
+    - check 13: each option's `onSelect` performs the right action;
+    - check 15: a phone still opens the action sheet.
+
+    Checks 14 and 16 are on the device.
+  - **Risk.**
+    - The menu is a route on top of multiview, so it may take the tile views off the window. That's harmless only with addendum 1, so the two ship together.
+    - Focus return after Back must be checked on the device.
+  - **Size.** About 80 lines of code plus tests, together with addendum 1's ~10. That's still one PR (#10), but it is now two concerns: the player lifecycle and the menu. Splitting the menu into its own PR is an option if Kush prefers.

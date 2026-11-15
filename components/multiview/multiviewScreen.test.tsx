@@ -13,9 +13,10 @@ type TileProps = {
   itemId: string;
   frame: TileFrame;
   onPress: () => void;
-  onLongPress: () => void;
+  onLongPress: (name?: string) => void;
   hasTVPreferredFocus?: boolean;
   onTargetRef?: unknown;
+  showStats?: boolean;
 };
 
 /** Each tile's latest props, by item id. */
@@ -51,14 +52,34 @@ jest.mock("@/components/multiview/MultiviewPicker", () => ({
 
 /** The option the next action sheet picks, by index. */
 let mockSheetChoice = 0;
+const mockActionSheet = jest.fn();
 jest.mock("@expo/react-native-action-sheet", () => ({
   useActionSheet: () => ({
     showActionSheetWithOptions: (
-      _options: unknown,
+      options: unknown,
       callback: (index: number) => void,
-    ) => callback(mockSheetChoice),
+    ) => {
+      mockActionSheet(options);
+      callback(mockSheetChoice);
+    },
   }),
 }));
+
+type TVMenu = {
+  title: string;
+  options: { label: string; sublabel?: string; value: string }[];
+  onSelect: (value: string) => void;
+  deferApplyUntilDismissed?: boolean;
+};
+/** Every TV option menu the screen opened, latest last. */
+const mockTVMenus: TVMenu[] = [];
+jest.mock("@/hooks/useTVOptionModal", () => ({
+  useTVOptionModal: () => ({
+    showOptions: (menu: TVMenu) => mockTVMenus.push(menu),
+  }),
+}));
+
+const mockOpenTileQuality = jest.fn();
 
 let mockItemIds = "a,b";
 jest.mock("expo-router", () => ({
@@ -88,7 +109,7 @@ jest.mock("@/components/multiview/useMultiviewQualityPicker", () => ({
     quality: "8 Mb/s",
     locked: false,
     openShared: jest.fn(),
-    openTile: jest.fn(),
+    openTile: (...args: unknown[]) => mockOpenTileQuality(...args),
   }),
 }));
 jest.mock("@/hooks/useOrientation", () => ({
@@ -153,7 +174,31 @@ beforeEach(() => {
   mockUnmounts.length = 0;
   mockItemIds = "a,b";
   mockPickerProps = null;
+  mockTVMenus.length = 0;
+  mockActionSheet.mockClear();
+  mockOpenTileQuality.mockClear();
 });
+
+/** Runs a test body as on a TV, putting the platform back after. */
+const onTV = async (body: () => Promise<void>) => {
+  const wasTV = Platform.isTV;
+  Object.defineProperty(Platform, "isTV", { value: true, configurable: true });
+  try {
+    await body();
+  } finally {
+    Object.defineProperty(Platform, "isTV", {
+      value: wasTV,
+      configurable: true,
+    });
+  }
+};
+
+/** Long-presses a tile on TV and picks a TV menu option by its position. */
+const tvMenu = async (itemId: string, name: string, position: number) => {
+  await act(() => mockTileProps[itemId].onLongPress(name));
+  const menu = mockTVMenus[mockTVMenus.length - 1];
+  await act(() => menu.onSelect(menu.options[position].value));
+};
 
 describe("making a tile the main tile", () => {
   test("from its menu keeps the draw order and gives it the big frame", async () => {
@@ -200,27 +245,18 @@ describe("making a tile the main tile", () => {
   });
 
   test("gives the main tile the remote's starting focus", async () => {
-    const wasTV = Platform.isTV;
-    Object.defineProperty(Platform, "isTV", {
-      value: true,
-      configurable: true,
-    });
-    try {
+    // On TV the tile menu is the TV menu; Make main is its first option.
+    await onTV(async () => {
       await render(<MultiviewRoute />);
       await switchLayout();
 
-      await menu("b", MAKE_MAIN);
+      await tvMenu("b", "WFXT", 0);
 
       expect(mockTileProps.b.hasTVPreferredFocus).toBe(true);
       expect(mockTileProps.a.hasTVPreferredFocus).toBe(false);
       expect(mockTileProps.b.onTargetRef).toBeDefined();
       expect(mockTileProps.a.onTargetRef).toBeUndefined();
-    } finally {
-      Object.defineProperty(Platform, "isTV", {
-        value: wasTV,
-        configurable: true,
-      });
-    }
+    });
   });
 });
 
@@ -247,5 +283,103 @@ describe("other changes to the tiles", () => {
     expect(mockUnmounts).toEqual(["b"]);
     expect(mockMounts).toEqual(["a", "b", "b"]);
     expect(drawOrder()).toEqual(["a", "b"]);
+  });
+});
+
+describe("a tile's menu on TV", () => {
+  // The phone action sheet on a Fire TV was a white panel over most of the
+  // screen with no title and no visible focus; TV uses the app's TV menu.
+  test("opens the TV menu titled with the tile's name, not the action sheet", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await act(() => mockTileProps.b.onLongPress("WFXT"));
+
+      expect(mockActionSheet).not.toHaveBeenCalled();
+      expect(mockTVMenus).toHaveLength(1);
+      expect(mockTVMenus[0].title).toBe("WFXT");
+      expect(mockTVMenus[0].options.map((o) => o.label)).toEqual([
+        "multiview.make_main",
+        "multiview.stats_quality_tile",
+        "multiview.stats_show",
+        "multiview.reconnect",
+        "multiview.remove_tile",
+      ]);
+      expect(mockTVMenus[0].options[1].sublabel).toBe("8 Mb/s");
+    });
+  });
+
+  test("a tile with no name yet is titled as tile options", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await act(() => mockTileProps.b.onLongPress());
+
+      expect(mockTVMenus[0].title).toBe("multiview.tile_menu");
+    });
+  });
+
+  test("Make main makes it the main tile", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+      await switchLayout();
+
+      await tvMenu("b", "WFXT", 0);
+
+      expect(isBig("b")).toBe(true);
+      expect(drawOrder()).toEqual(["a", "b"]);
+    });
+  });
+
+  test("Quality opens that tile's quality picker, after the menu closes", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await tvMenu("b", "WFXT", 1);
+
+      expect(mockTVMenus[0].deferApplyUntilDismissed).toBe(true);
+      expect(mockOpenTileQuality).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("Show stats turns that tile's stats on", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await tvMenu("b", "WFXT", 2);
+
+      expect(mockTileProps.b.showStats).toBe(true);
+      expect(mockTileProps.a.showStats).toBe(false);
+    });
+  });
+
+  test("Reconnect rebuilds that tile alone", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await tvMenu("b", "WFXT", 3);
+
+      expect(mockUnmounts).toEqual(["b"]);
+    });
+  });
+
+  test("Remove takes that tile away", async () => {
+    await onTV(async () => {
+      await render(<MultiviewRoute />);
+
+      await tvMenu("b", "WFXT", 4);
+
+      expect(drawOrder()).toEqual(["a"]);
+    });
+  });
+
+  test("a phone keeps the action sheet", async () => {
+    await render(<MultiviewRoute />);
+    mockSheetChoice = 5; // Cancel
+
+    await act(() => mockTileProps.b.onLongPress("WFXT"));
+
+    expect(mockActionSheet).toHaveBeenCalledTimes(1);
+    expect(mockTVMenus).toHaveLength(0);
   });
 });
