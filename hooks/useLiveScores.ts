@@ -1,5 +1,6 @@
 import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useQuery } from "@tanstack/react-query";
+import { useSetAtom } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LIVE_SCORES_DELAY_DEFAULT_S,
@@ -7,8 +8,14 @@ import {
   LIVE_SCORES_POLL_LIVE_MS,
   LIVE_SCORES_SCOREBOARD_URL,
   LIVE_SCORES_STALE_MS,
+  LIVE_SCORES_TAG_COLORS,
 } from "@/constants/LiveScores";
 import { useChannelsNow } from "@/hooks/useChannelsNow";
+import {
+  type LiveScoresView,
+  liveScoresViewAtom,
+  type PinnedGame,
+} from "@/utils/atoms/liveScores";
 import { useSettings } from "@/utils/atoms/settings";
 import { markExpectedError } from "@/utils/errors";
 import {
@@ -26,6 +33,7 @@ import {
   type MatchResult,
   matchGame,
 } from "@/utils/livescores/matchGame";
+import { otherGames } from "@/utils/livescores/railItems";
 import { writeDebugLog } from "@/utils/log";
 
 /** A multiview tile, as far as scores care: its key and what it plays. */
@@ -238,5 +246,65 @@ export const useLiveScores = (tiles: LiveScoreTile[]) => {
     return result;
   }, [footballTiles, unavailableReason, matches, shown]);
 
-  return { tiles: byTile, games: shown?.data ?? [] };
+  // The rail's view. A tile's game is pinned as soon as the newest fetch
+  // matches it, but its score only once a fetch is a delay old; and it is
+  // left out of the live list from that first moment, or the rail would
+  // show its score live while the pinned slot waits.
+  const delaySeconds = delayMs / 1000;
+  const view = useMemo((): LiveScoresView | null => {
+    if (footballTiles.length === 0) return null;
+    if (unavailableReason) {
+      return {
+        status: "unavailable",
+        reason: unavailableReason,
+        pinned: [],
+        others: [],
+        delaySeconds,
+      };
+    }
+    const newest = latest?.data ?? [];
+    const pinned: PinnedGame[] = [];
+    for (const tile of footballTiles) {
+      const gameId =
+        matches.get(tile.key)?.gameId ??
+        matchGame({ program: programs.get(tile.itemId), games: newest })
+          ?.gameId;
+      if (!gameId || pinned.some((p) => p.gameId === gameId)) continue;
+      const known =
+        newest.find((g) => g.id === gameId) ??
+        shown?.data.find((g) => g.id === gameId);
+      if (!known) continue;
+      pinned.push({
+        tileKey: tile.key,
+        color:
+          LIVE_SCORES_TAG_COLORS[pinned.length % LIVE_SCORES_TAG_COLORS.length],
+        gameId,
+        teams: { away: known.away.abbr, home: known.home.abbr },
+        game: shown?.data.find((g) => g.id === gameId) ?? null,
+      });
+    }
+    return {
+      status: "ok",
+      pinned,
+      others: otherGames(newest, new Set(pinned.map((p) => p.gameId))),
+      delaySeconds,
+    };
+  }, [
+    footballTiles,
+    unavailableReason,
+    latest,
+    matches,
+    programs,
+    shown,
+    delaySeconds,
+  ]);
+
+  const setView = useSetAtom(liveScoresViewAtom);
+  useEffect(() => {
+    setView(view);
+  }, [view, setView]);
+  // Gone with the screen: a scores screen opened later must not show these.
+  useEffect(() => () => setView(null), [setView]);
+
+  return { tiles: byTile, games: shown?.data ?? [], view };
 };

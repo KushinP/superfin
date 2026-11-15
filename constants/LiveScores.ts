@@ -74,3 +74,15 @@ export const LIVE_SCORES_RAIL_SEPARATOR_WIDTH = 16;
 
 /** How long the rail shows one page of the other games before the next. */
 export const LIVE_SCORES_RAIL_PAGE_MS = 8 * 1000;
+
+/**
+ * Tag colours for the games on the tiles, in the order they are pinned: the
+ * rail's pinned game and its tile's top edge share one, so a score is easy
+ * to tie to its picture. Four, for multiview's four tiles.
+ */
+export const LIVE_SCORES_TAG_COLORS = [
+  "#60a5fa",
+  "#f59e0b",
+  "#a78bfa",
+  "#34d399",
+] as const;
