@@ -1,6 +1,7 @@
 # Live scores, v2: a scores rail plus a scores screen on demand — product spec
 
-Status: Approved (Gate 1)
+Status: Approved (Gates 1 and 2)
+Technical plan: `docs/specs/2026-11-15-live-scores-rail-plan.md`
 Date: 2026-11-15
 Branch: `kush/live-scores-rail`
 Builds on: `docs/specs/2026-11-15-live-scores-overlay.md` (P0 shipped in #12). This replaces its P0-2 "score bug on the tile". The poller, the spoiler delay and the matching stay as built.
@@ -125,3 +126,10 @@ What would confirm it: on a game day, Kush glances at the rail instead of his ph
 - **Unofficial ESPN fields.** The leaders, last play, win probability and drive fields come from the same unofficial feed and can change. Each detail is optional, and a missing one is left out (R6).
 - **Merges with #12's menu changes.** The tile menu item changes name and job. develop's screen tests cover the menu order.
 - **Fire TV look.** "Glass" on Android TV is a see-through dark panel. True blur isn't available there.
+
+## Changes
+
+- 2026-11-15, Gate 2: with one tile up the picture fills the screen and there's no black band, so the rail sits over the bottom edge, translucent. The P1-1 fallback is now P0 for 1, 3 or 4 tiles; the "never covers a picture" measure applies to 2 tiles.
+- 2026-11-15, Gate 2: leaders are per game (top passer, rusher and receiver across both teams), not per team, because that's what ESPN's scoreboard feed has. Leaders before kickoff (season stats) are hidden.
+- 2026-11-15, Gate 2: v1's "Live scores: 30 s behind" tile-menu sheet is removed; its delay and on/off controls live on the scores screen.
+- 2026-11-15, Gate 2: until the delay has passed, a pinned slot shows only the teams and a dash, and that game never appears live among the other games.
