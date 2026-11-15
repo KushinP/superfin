@@ -119,6 +119,14 @@ class ExoPlayerModule : Module() {
                 view.destroy()
             }
 
+            // The release guard for a view React removes without JS calling
+            // destroy() first. Not onDetachedFromWindow: a view is detached
+            // and reattached while it stays on screen (see ExoPlayerView's
+            // cleanup note). destroy() is safe to call twice.
+            OnViewDestroys { view: ExoPlayerView ->
+                view.destroy()
+            }
+
             AsyncFunction("seekTo") { view: ExoPlayerView, position: Double ->
                 view.seekTo(position)
             }

@@ -1399,9 +1399,11 @@ class ExoPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     }
 
     // MARK: - Cleanup
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        destroy()
-    }
+    //
+    // No release in onDetachedFromWindow: a view is taken off the window and
+    // put back while it stays on screen. On a Fire TV, a multiview tile's
+    // long-press menu did it to every tile, and each released its player and
+    // reconnected its live channel 16 s later. The player is released by JS
+    // destroy() when a tile or the full-screen player goes away, and by
+    // ExoPlayerModule's OnViewDestroys when React drops the view.
 }
