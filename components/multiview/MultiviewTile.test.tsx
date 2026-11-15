@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { AppState } from "react-native";
 import { Colors, MultiviewColors } from "@/constants/Colors";
 import { QueryWrapper } from "@/test-utils/queryWrapper";
 
 type Handler<T> = (e: { nativeEvent: T }) => void;
 let mockOnProgress:
-  | Handler<{ position: number; duration?: number }>
+  | Handler<{ position: number; duration?: number; cacheSeconds?: number }>
   | undefined;
 const mockGetEpisodes = jest.fn();
 let mockSources: ({ muted?: boolean } | undefined)[] = [];
@@ -96,6 +97,21 @@ jest.mock("@/hooks/useMultiviewTileStream", () => ({
     return mockStream;
   },
 }));
+/** The tile's TV remote key handler, as the TV event hook was given it. */
+let mockTVKeys:
+  | ((evt: { eventType: string; eventKeyAction?: number }) => void)
+  | undefined;
+jest.mock("@/hooks/useTVEventHandler", () => ({
+  useTVEventHandler: (
+    handler: (evt: { eventType: string; eventKeyAction?: number }) => void,
+  ) => {
+    mockTVKeys = handler;
+  },
+}));
+const mockWriteToLog = jest.fn();
+jest.mock("@/utils/log", () => ({
+  writeToLog: (...args: unknown[]) => mockWriteToLog(...args),
+}));
 jest.mock("jotai", () => ({
   ...jest.requireActual("jotai"),
   useAtomValue: () => ({ basePath: "https://jf.example.com" }),
@@ -152,9 +168,9 @@ const renderTile = (showLabel = true) =>
     </QueryWrapper>,
   );
 
-const tick = async (position: number, duration = 0) => {
+const tick = async (position: number, duration = 0, cacheSeconds?: number) => {
   await act(async () =>
-    mockOnProgress?.({ nativeEvent: { position, duration } }),
+    mockOnProgress?.({ nativeEvent: { position, duration, cacheSeconds } }),
   );
 };
 const playerState = async (state: {
@@ -169,6 +185,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockOnProgress = undefined;
   mockOnState = undefined;
+  mockTVKeys = undefined;
   mockSources = [];
   mockStream = undefined;
   mockItem = {
@@ -553,6 +570,86 @@ describe("the tile's own menu", () => {
   });
 });
 
+describe("the TV remote's playback keys", () => {
+  // Reported on a Fire TV: play, pause, forward and rewind did nothing in
+  // multiview. The remote's keys never reached a tile, and its on-screen
+  // buttons sit inside the tile's own focus target, out of the D-pad's reach.
+  const press = async (eventType: string, eventKeyAction = 0) => {
+    await act(async () => mockTVKeys?.({ eventType, eventKeyAction }));
+  };
+  const focus = async () => {
+    await fireEvent(screen.getByTestId("multiview-tile-target"), "focus");
+  };
+
+  test("⏯ pauses the focused tile, and plays it once it is paused", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("playPause");
+    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+
+    await playerState({ isPaused: true });
+    await press("playPause");
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("⏪ goes back 10 seconds and ⏩ forward 30", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("rewind");
+    await press("fastForward");
+
+    expect(mockPlayer.seekBy.mock.calls).toEqual([[-10], [30]]);
+  });
+
+  test("the separate Play and Pause keys play and pause", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("pause");
+    await press("play");
+
+    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("a key counts once, on the press and not the release", async () => {
+    await renderTile(false);
+    await focus();
+
+    await press("rewind", 0);
+    await press("rewind", 1);
+
+    expect(mockPlayer.seekBy).toHaveBeenCalledTimes(1);
+  });
+
+  test("a tile without the focus ignores them", async () => {
+    await renderTile(false);
+    await focus();
+    await fireEvent(screen.getByTestId("multiview-tile-target"), "blur");
+
+    await press("playPause");
+    await press("fastForward");
+
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+    expect(mockPlayer.seekBy).not.toHaveBeenCalled();
+  });
+
+  test("a live channel ignores them: there is nothing to pause or skip", async () => {
+    mockItem = { Id: "chan-1", Name: "WBZ-DT", Type: "TvChannel" };
+    await renderTile(false);
+    await focus();
+
+    await press("playPause");
+    await press("rewind");
+
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+    expect(mockPlayer.play).not.toHaveBeenCalled();
+    expect(mockPlayer.seekBy).not.toHaveBeenCalled();
+  });
+});
+
 describe("a live channel that stops receiving video", () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -589,12 +686,86 @@ describe("a live channel that stops receiving video", () => {
     await tick(2, 0);
     expect(onPlaying).toHaveBeenCalled();
 
-    // The stall is noticed first, then the reconnect waits out the cushion.
+    // The stall is noticed first, then the reconnect waits 30 s. It was 12 s,
+    // and on 2026-11-08 Fox dropped four times in 13 minutes: each reconnect
+    // closed a channel the server was still sending (spec 2026-11-08).
     await act(async () => jest.advanceTimersByTime(3_000));
-    await act(async () => jest.advanceTimersByTime(8_000));
+    await act(async () => jest.advanceTimersByTime(26_000));
     expect(onStuck).not.toHaveBeenCalled();
-    await act(async () => jest.advanceTimersByTime(5_000));
+    await act(async () => jest.advanceTimersByTime(4_000));
     expect(onStuck).toHaveBeenCalledTimes(1);
+  });
+
+  test("says in the log why it reconnects", async () => {
+    // The freeze behind the Fox drops is unexplained; what was buffered and
+    // whether the app was in front tell a starved stream from a stuck player
+    // from a backgrounded app.
+    // Jest's React Native has no app state to read; this one was sent away.
+    Object.defineProperty(AppState, "currentState", {
+      value: "background",
+      configurable: true,
+    });
+    const onStuck = jest.fn();
+    await renderLive(onStuck);
+    await tick(0, 0, 4);
+    await tick(1, 0, 3);
+    await tick(2, 0, 1.5);
+    await act(async () => jest.advanceTimersByTime(3_000));
+    await act(async () => jest.advanceTimersByTime(30_000));
+    expect(onStuck).toHaveBeenCalledTimes(1);
+    expect(mockWriteToLog).toHaveBeenCalledTimes(1);
+    const [level, message, data] = mockWriteToLog.mock.calls[0];
+    expect(level).toBe("WARN");
+    expect(message).toMatch(/reconnect/);
+    expect(data).toMatchObject({
+      itemId: "chan-1",
+      name: "WFXT",
+      started: true,
+      bufferedSeconds: 1.5,
+      appState: "background",
+    });
+    expect(data.frozenSeconds).toBeGreaterThanOrEqual(30);
+    expect(data.frozenSeconds).toBeLessThan(34);
+  });
+
+  test("a player that never says what it buffered is logged as unknown", async () => {
+    // ExoPlayer on Android TV sends no cacheSeconds; a 0 would read as
+    // "ran dry".
+    await renderLive(jest.fn());
+    await tick(0, 0);
+    await tick(1, 0);
+    await tick(2, 0);
+    await act(async () => jest.advanceTimersByTime(3_000));
+    await act(async () => jest.advanceTimersByTime(30_000));
+    expect(mockWriteToLog.mock.calls[0][2]).toMatchObject({
+      bufferedSeconds: "unknown",
+    });
+  });
+
+  test("a channel frozen 20 s that moves again is left alone", async () => {
+    const onStuck = jest.fn();
+    await renderLive(onStuck);
+    await tick(0, 0);
+    await tick(1, 0);
+    await tick(2, 0);
+    await act(async () => jest.advanceTimersByTime(3_000));
+    await act(async () => jest.advanceTimersByTime(17_000));
+    await tick(3, 0);
+    await act(async () => jest.advanceTimersByTime(20_000));
+    expect(onStuck).not.toHaveBeenCalled();
+    expect(mockWriteToLog).not.toHaveBeenCalled();
+  });
+
+  test("a movie never reconnects itself, however long it stalls", async () => {
+    mockItem = { Id: "movie-1", Name: "A Movie", Type: "Movie" };
+    const onStuck = jest.fn();
+    await renderLive(onStuck);
+    await tick(0, 7_200);
+    await tick(1, 7_200);
+    await tick(2, 7_200);
+    await act(async () => jest.advanceTimersByTime(3_000));
+    await act(async () => jest.advanceTimersByTime(120_000));
+    expect(onStuck).not.toHaveBeenCalled();
   });
 
   test("a channel that recovers by itself is left alone", async () => {
@@ -617,6 +788,10 @@ describe("a live channel that stops receiving video", () => {
     expect(onStuck).not.toHaveBeenCalled();
     await act(async () => jest.advanceTimersByTime(15_000));
     expect(onStuck).toHaveBeenCalledTimes(1);
+    expect(mockWriteToLog.mock.calls[0][2]).toMatchObject({
+      itemId: "chan-1",
+      started: false,
+    });
   });
 
   test("a paused channel is not reconnected", async () => {

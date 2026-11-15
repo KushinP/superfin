@@ -38,11 +38,21 @@ jest.mock("@/utils/profiles/native", () => ({
   generateDeviceProfile: () => ({}),
 }));
 jest.mock("@/utils/log", () => ({ writeToLog: jest.fn() }));
+// The playlist check is its own module with its own spec; here it answers
+// whatever a test needs, "ok" unless told otherwise.
+const mockProbe = jest.fn((_url: string, _headers?: object) =>
+  Promise.resolve("ok"),
+);
+jest.mock("@/utils/multiview/liveProbe", () => ({
+  probeLivePlaylist: (url: string, headers?: object) => mockProbe(url, headers),
+}));
 jest.mock("@/utils/customHeaders", () =>
   jest.requireActual("@/test-utils/customHeaders").customHeadersModule(),
 );
 
 import { PROGRESS_REPORT_INTERVAL } from "@/constants/Playback";
+import { writeToLog } from "@/utils/log";
+import { resetLiveReopenGap } from "@/utils/multiview/liveReopenGap";
 import { useMultiviewTileStream } from "./useMultiviewTileStream";
 
 const channel = { Id: "chan-1", Type: "TvChannel" };
@@ -61,7 +71,12 @@ describe("useMultiviewTileStream", () => {
     jest.clearAllMocks();
     mockSettings = { audioTranscodeMode: "auto" };
     mockGetItem.mockResolvedValue({ data: channel });
+    mockProbe.mockResolvedValue("ok");
+    // The gap after a live stop is shared by every tile; one test's closed
+    // channel must not hold up the next test's open.
+    resetLiveReopenGap();
   });
+  afterEach(() => jest.useRealTimers());
 
   test("reports progress while open, and stops reporting once closed", async () => {
     // Reported in review: only start and stop went out, so resume points and
@@ -225,6 +240,7 @@ describe("useMultiviewTileStream", () => {
     // A quality change restarts every tile at once. Two live tiles on a dual
     // tuner asked for new tuners while the old streams still held both, and
     // spun.
+    jest.useFakeTimers();
     let releaseTuner: () => void = () => {};
     mockGetStreamUrl.mockResolvedValue(liveStream);
     const first = await renderHook(() => useMultiviewTileStream("chan-1"));
@@ -244,7 +260,136 @@ describe("useMultiviewTileStream", () => {
     expect(mockGetStreamUrl).not.toHaveBeenCalled();
 
     await act(async () => releaseTuner());
+    // Then the tuner's grace period after a live stop (spec 2026-11-08).
+    await act(async () => jest.advanceTimersByTime(5_000));
     await waitFor(() => expect(mockGetStreamUrl).toHaveBeenCalledTimes(1));
     await second.unmount();
+  });
+
+  describe("reopening a live channel", () => {
+    beforeEach(() => jest.useFakeTimers());
+
+    const openThenClose = async () => {
+      mockGetStreamUrl.mockResolvedValue(liveStream);
+      const first = await renderHook(() => useMultiviewTileStream("chan-1"));
+      await waitFor(() =>
+        expect(first.result.current.state.status).toBe("ready"),
+      );
+      await first.unmount();
+      mockGetStreamUrl.mockClear();
+      mockProbe.mockClear();
+      mockStopped.mockClear();
+    };
+    const advance = async (ms: number) => {
+      await act(async () => jest.advanceTimersByTime(ms));
+    };
+
+    test("waits 5 s after the last live stop before asking for a stream", async () => {
+      // On 2026-11-08 a reopen right after a stop got HTTP 500: Jellyfin had
+      // closed the tuner 2-3 s before and was not done with it.
+      await openThenClose();
+      const second = await renderHook(() => useMultiviewTileStream("chan-1"));
+      await advance(4_900);
+      expect(mockGetStreamUrl).not.toHaveBeenCalled();
+      await advance(100);
+      await waitFor(() => expect(mockGetStreamUrl).toHaveBeenCalledTimes(1));
+      await second.unmount();
+    });
+
+    test("a refused open is tried again after 2 s and 4 s, then plays", async () => {
+      mockGetStreamUrl.mockResolvedValue(liveStream);
+      mockProbe
+        .mockResolvedValueOnce("failed")
+        .mockResolvedValueOnce("failed")
+        .mockResolvedValueOnce("ok");
+      const { result, unmount } = await renderHook(() =>
+        useMultiviewTileStream("chan-1"),
+      );
+      await waitFor(() => expect(mockProbe).toHaveBeenCalledTimes(1));
+      expect(result.current.state.status).toBe("loading");
+      await advance(1_900);
+      expect(mockProbe).toHaveBeenCalledTimes(1);
+      await advance(100);
+      expect(mockProbe).toHaveBeenCalledTimes(2);
+      await advance(4_000);
+      expect(mockProbe).toHaveBeenCalledTimes(3);
+      await waitFor(() => expect(result.current.state.status).toBe("ready"));
+      // The playlist checked is the one the player is handed, with its headers.
+      expect(mockProbe.mock.calls[0][0]).toBe(liveStream.url);
+      expect(mockProbe.mock.calls[0][1]).toMatchObject({
+        Authorization: 'MediaBrowser Token="tok"',
+      });
+      // Each refusal is in the log, and the server hears a start only once.
+      expect(writeToLog).toHaveBeenCalledWith(
+        "WARN",
+        expect.stringMatching(/not ready/),
+        expect.objectContaining({ itemId: "chan-1" }),
+      );
+      expect(mockStart).toHaveBeenCalledTimes(1);
+      await unmount();
+    });
+
+    test("a channel refused every time gives up after the 8 s try and frees its tuner", async () => {
+      mockGetStreamUrl.mockResolvedValue(liveStream);
+      mockProbe.mockResolvedValue("failed");
+      const { result, unmount } = await renderHook(() =>
+        useMultiviewTileStream("chan-1"),
+      );
+      await waitFor(() => expect(mockProbe).toHaveBeenCalledTimes(1));
+      await advance(2_000);
+      await advance(4_000);
+      await advance(8_000);
+      await waitFor(() => expect(result.current.state.status).toBe("error"));
+      expect(mockProbe).toHaveBeenCalledTimes(4);
+      expect(stopInfo()).toMatchObject({ LiveStreamId: "live-1" });
+      expect(mockStart).not.toHaveBeenCalled();
+      // It stays given up: no more tries, and closing it stops nothing twice.
+      await advance(60_000);
+      expect(mockProbe).toHaveBeenCalledTimes(4);
+      await unmount();
+      expect(mockStopped).toHaveBeenCalledTimes(1);
+    });
+
+    test("a tile removed between tries still frees its tuner", async () => {
+      mockGetStreamUrl.mockResolvedValue(liveStream);
+      mockProbe.mockResolvedValue("failed");
+      const { unmount } = await renderHook(() =>
+        useMultiviewTileStream("chan-1"),
+      );
+      await waitFor(() => expect(mockProbe).toHaveBeenCalledTimes(1));
+      await unmount();
+      expect(stopInfo()).toMatchObject({ LiveStreamId: "live-1" });
+      await advance(20_000);
+      expect(mockProbe).toHaveBeenCalledTimes(1);
+    });
+
+    test("a probe that cannot tell leaves it to the player", async () => {
+      mockGetStreamUrl.mockResolvedValue(liveStream);
+      mockProbe.mockResolvedValue("unknown");
+      const { result, unmount } = await renderHook(() =>
+        useMultiviewTileStream("chan-1"),
+      );
+      await waitFor(() => expect(result.current.state.status).toBe("ready"));
+      expect(mockProbe).toHaveBeenCalledTimes(1);
+      await unmount();
+    });
+
+    test("a movie neither waits for the tuner nor checks a playlist", async () => {
+      await openThenClose();
+      mockGetItem.mockResolvedValue({
+        data: { Id: "movie-1", Type: "Movie" },
+      });
+      mockGetStreamUrl.mockResolvedValue({
+        url: "https://jf.example.com/Videos/movie-1/stream",
+        sessionId: "play-3",
+        mediaSource: { Id: "movie-1" },
+      });
+      const { result, unmount } = await renderHook(() =>
+        useMultiviewTileStream("movie-1"),
+      );
+      await waitFor(() => expect(result.current.state.status).toBe("ready"));
+      expect(mockProbe).not.toHaveBeenCalled();
+      await unmount();
+    });
   });
 });
