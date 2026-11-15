@@ -6,7 +6,10 @@ import { getLibraryApi, getSessionApi } from "@jellyfin/sdk/lib/utils/api";
 import { useAtomValue } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import { MULTIVIEW_STOP_WAIT_LIMIT } from "@/constants/Multiview";
+import {
+  MULTIVIEW_LIVE_OPEN_RETRY_DELAYS,
+  MULTIVIEW_STOP_WAIT_LIMIT,
+} from "@/constants/Multiview";
 import { PROGRESS_REPORT_INTERVAL } from "@/constants/Playback";
 import type { MpvVideoSource } from "@/modules";
 import { apiAtom, userAtom } from "@/utils/atoms/api";
@@ -15,6 +18,11 @@ import { getStreamUrl } from "@/utils/jellyfin/media/getStreamUrl";
 import { livePauseWait } from "@/utils/jellyfin/media/livePauseWait";
 import { writeToLog } from "@/utils/log";
 import { multiviewEngine } from "@/utils/multiview/availability";
+import { probeLivePlaylist } from "@/utils/multiview/liveProbe";
+import {
+  liveReopenWait,
+  noteLiveStopSent,
+} from "@/utils/multiview/liveReopenGap";
 import type { TileQuality } from "@/utils/multiview/multiview";
 import { tileMaxBitrate } from "@/utils/multiview/tileBitrate";
 import { buildTileSource, type TileStream } from "@/utils/multiview/tileSource";
@@ -57,6 +65,11 @@ const stopsSettled = () =>
           setTimeout(resolve, MULTIVIEW_STOP_WAIT_LIMIT),
         ),
       ]);
+
+const sleep = (ms: number) =>
+  ms > 0
+    ? new Promise((resolve) => setTimeout(resolve, ms))
+    : Promise.resolve();
 
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -124,8 +137,9 @@ export const useMultiviewTileStream = (
     const reportStopped = (session: {
       item: BaseItemDto;
       stream: TileStream;
-    }) =>
-      trackStop(
+    }) => {
+      if (session.stream.mediaSource?.LiveStreamId) noteLiveStopSent();
+      return trackStop(
         getSessionApi(api)
           .reportPlaybackStopped({
             playbackStopInfo: {
@@ -145,6 +159,7 @@ export const useMultiviewTileStream = (
             ),
           ),
       );
+    };
 
     const open = async () => {
       setState({ status: "loading" });
@@ -158,8 +173,13 @@ export const useMultiviewTileStream = (
           item.Type === "TvChannel"
             ? 0
             : (item.UserData?.PlaybackPositionTicks ?? 0);
+        // A channel, or a program played through it, needs a tuner.
+        const isLive = livePauseWait(item) !== undefined;
         // Opening a stream can take a tuner a closing tile still holds.
         await stopsSettled();
+        // And a stop that has been answered can still be closing the tuner:
+        // asked again 2-3 s after a stop, Jellyfin answered HTTP 500.
+        if (isLive) await sleep(liveReopenWait());
         if (cancelled) return;
         const res = await getStreamUrl({
           api,
@@ -190,16 +210,41 @@ export const useMultiviewTileStream = (
           return;
         }
         positionRef.current = ticksToSeconds(startTicks);
+        const source = buildTileSource(stream, {
+          basePath: api.basePath,
+          accessToken: api.accessToken,
+          startPosition: positionRef.current,
+          pauseWaitSeconds: livePauseWait(item),
+        });
+        // MPV keeps a refused live stream to itself, so the playlist is
+        // checked first and a refusal tried again soon, not after the 30 s
+        // first-frame timeout. A check that cannot tell leaves it to MPV.
+        if (isLive) {
+          for (let attempt = 0; ; attempt++) {
+            const probe = await probeLivePlaylist(source.url, source.headers);
+            if (cancelled) return;
+            if (probe !== "failed") break;
+            writeToLog("WARN", "multiview: live stream not ready", {
+              itemId,
+              name: item.Name,
+              attempt: attempt + 1,
+            });
+            const delay = MULTIVIEW_LIVE_OPEN_RETRY_DELAYS[attempt];
+            if (delay === undefined) {
+              // Given up: free the tuner now, not when the tile is closed.
+              void reportStopped(opened);
+              opened = null;
+              throw new Error("Live stream refused after every try");
+            }
+            await sleep(delay);
+            if (cancelled) return;
+          }
+        }
         setState({
           status: "ready",
           item,
           mediaSource: stream.mediaSource,
-          source: buildTileSource(stream, {
-            basePath: api.basePath,
-            accessToken: api.accessToken,
-            startPosition: positionRef.current,
-            pauseWaitSeconds: livePauseWait(item),
-          }),
+          source,
         });
         getSessionApi(api)
           .reportPlaybackStart({
