@@ -8,6 +8,7 @@ import { SettingSwitch } from "@/components/common/SettingSwitch";
 import { PlatformDropdown } from "@/components/PlatformDropdown";
 import { PLAYBACK_SPEEDS } from "@/components/PlaybackSpeedSelector";
 import DisabledSetting from "@/components/settings/DisabledSetting";
+import { LiveScoresSettings } from "@/components/settings/LiveScoresSettings";
 import { stillWatchingPresetLabel } from "@/components/settings/stillWatchingPresetLabel";
 import { STILL_WATCHING_PRESET_ORDER } from "@/constants/StillWatching";
 import useRouter from "@/hooks/useAppRouter";
@@ -225,6 +226,8 @@ export const PlaybackControlsSettings: React.FC = () => {
             />
           </ListItem>
         )}
+
+        {isMultiviewAvailable(Platform) && <LiveScoresSettings />}
 
         <ListItem
           title={t("home.settings.other.default_playback_speed")}

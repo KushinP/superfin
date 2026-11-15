@@ -15,6 +15,7 @@ import { Text } from "@/components/common/Text";
 import { TVPasswordEntryModal } from "@/components/login/TVPasswordEntryModal";
 import { TVPINEntryModal } from "@/components/login/TVPINEntryModal";
 import { stillWatchingPresetLabel } from "@/components/settings/stillWatchingPresetLabel";
+import { TVLiveScoresSettings } from "@/components/settings/TVLiveScoresSettings";
 import type { TVOptionItem } from "@/components/tv";
 import {
   TVCustomHeadersSection,
@@ -907,6 +908,8 @@ export default function SettingsTV() {
               }
             />
           )}
+
+          {isMultiviewAvailable(Platform) && <TVLiveScoresSettings />}
 
           {/* Engine selector — Android TV only */}
           {isAndroidTv && (
