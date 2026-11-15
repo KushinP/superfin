@@ -265,3 +265,13 @@ Checked:
 - Every stored value supports a test.
 - The no-polling control (A11) matches decision 2.
 - The "no secrets in the app" requirement (A12) matches decision 8.
+
+## Changes
+
+- 2026-11-15, slice 3: the poll interval (15 s or 5 min) is decided from the newest fetch, not the delayed one; judged on the delayed one, the first half minute of every game would have polled slowly. Only what is drawn waits for the delay.
+- 2026-11-15, slice 3: once scores are stale the hook stops scheduling wake-ups, so it cannot spin on a zero-length timer.
+- 2026-11-15, slice 4: the tile menu item is "Live scores: N s behind" and opens a sheet (5 s later, 5 s sooner, turn off/on); see the product spec's P0-4.
+- 2026-11-15, slice 5: stepDelaySeconds and delayChoices in delayBuffer.ts are the one definition of a delay step and of 0-90 s, shared by the tile menu, the TV stepper and the phone dropdown. The settings rows are their own components (LiveScoresSettings, TVLiveScoresSettings).
+- 2026-11-15, test-gate: the A6 test lives in components/multiview/multiviewScores.test.tsx (the real screen with stand-in tiles, counting tile builds) and components/multiview/useLiveScoresMenu.test.ts, not the planned multiviewScoreMenu.test.tsx. A1's "stays when the toolbar hides" is checked there too.
+- 2026-11-15, test-gate: develop has since gained PR #10, whose components/multiview/multiviewScreen.test.tsx picks Remove as menu option 4. Merging this branch moves Remove to 5, so that test's REMOVE constant must change with the merge.
+
