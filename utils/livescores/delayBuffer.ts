@@ -63,3 +63,22 @@ export const clampDelaySeconds = (seconds: number): number => {
     Math.max(LIVE_SCORES_DELAY_MIN_S, stepped),
   );
 };
+
+/** One 5 s step later (1) or sooner (-1), kept in range. */
+export const stepDelaySeconds = (seconds: number, direction: 1 | -1): number =>
+  clampDelaySeconds(
+    clampDelaySeconds(seconds) + direction * LIVE_SCORES_DELAY_STEP_S,
+  );
+
+/** Every delay the settings offer, sooner first. */
+export const delayChoices = (): number[] => {
+  const choices: number[] = [];
+  for (
+    let s = LIVE_SCORES_DELAY_MIN_S;
+    s <= LIVE_SCORES_DELAY_MAX_S;
+    s += LIVE_SCORES_DELAY_STEP_S
+  ) {
+    choices.push(s);
+  }
+  return choices;
+};

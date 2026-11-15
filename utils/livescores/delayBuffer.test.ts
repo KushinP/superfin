@@ -1,8 +1,10 @@
 import {
   addSnapshot,
   clampDelaySeconds,
+  delayChoices,
   delayedSnapshot,
   type Snapshot,
+  stepDelaySeconds,
 } from "./delayBuffer";
 
 const at = (seconds: number) => 1_000_000 + seconds * 1000;
@@ -75,5 +77,31 @@ describe("clampDelaySeconds", () => {
     [Number.NaN, 30],
   ])("%p becomes %p", (input, expected) => {
     expect(clampDelaySeconds(input)).toBe(expected);
+  });
+});
+
+describe("stepDelaySeconds", () => {
+  test("moves one 5 s step later or sooner", () => {
+    expect(stepDelaySeconds(30, 1)).toBe(35);
+    expect(stepDelaySeconds(30, -1)).toBe(25);
+  });
+
+  test("stops at 0 and 90", () => {
+    expect(stepDelaySeconds(90, 1)).toBe(90);
+    expect(stepDelaySeconds(0, -1)).toBe(0);
+  });
+
+  test("starts from the default when the setting is unusable", () => {
+    expect(stepDelaySeconds(Number.NaN, 1)).toBe(35);
+  });
+});
+
+describe("delayChoices", () => {
+  test("every allowed delay, 0 to 90 s in 5 s steps", () => {
+    const choices = delayChoices();
+    expect(choices).toHaveLength(19);
+    expect(choices[0]).toBe(0);
+    expect(choices[6]).toBe(30);
+    expect(choices.at(-1)).toBe(90);
   });
 });

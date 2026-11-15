@@ -1,12 +1,12 @@
 import { useActionSheet } from "@expo/react-native-action-sheet";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  LIVE_SCORES_DELAY_DEFAULT_S,
-  LIVE_SCORES_DELAY_STEP_S,
-} from "@/constants/LiveScores";
+import { LIVE_SCORES_DELAY_DEFAULT_S } from "@/constants/LiveScores";
 import { useSettings } from "@/utils/atoms/settings";
-import { clampDelaySeconds } from "@/utils/livescores/delayBuffer";
+import {
+  clampDelaySeconds,
+  stepDelaySeconds,
+} from "@/utils/livescores/delayBuffer";
 
 /**
  * The live scores entry in a multiview tile's menu and the sheet it opens:
@@ -30,17 +30,9 @@ export const useLiveScoresMenu = () => {
     // Later first: a spoiler is what Kush is most likely fixing.
     const actions: (() => void)[] = [
       () =>
-        updateSettings({
-          liveScoresDelaySeconds: clampDelaySeconds(
-            delay + LIVE_SCORES_DELAY_STEP_S,
-          ),
-        }),
+        updateSettings({ liveScoresDelaySeconds: stepDelaySeconds(delay, 1) }),
       () =>
-        updateSettings({
-          liveScoresDelaySeconds: clampDelaySeconds(
-            delay - LIVE_SCORES_DELAY_STEP_S,
-          ),
-        }),
+        updateSettings({ liveScoresDelaySeconds: stepDelaySeconds(delay, -1) }),
       () => updateSettings({ liveScoresEnabled: !enabled }),
     ];
     const options = [
