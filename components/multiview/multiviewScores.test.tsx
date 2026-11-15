@@ -1,5 +1,4 @@
 import { act, render, screen } from "@testing-library/react-native";
-import type { TileScore } from "@/hooks/useLiveScores";
 import recorded from "@/utils/livescores/__fixtures__/scoreboard-2026-11-15.json";
 import { parseScoreboard } from "@/utils/livescores/espnScoreboard";
 
@@ -76,17 +75,30 @@ jest.mock("@/utils/atoms/settings", () => {
   };
 });
 
-// The poller is covered by useLiveScores.test.tsx; here it says the first
-// tile shows KC @ ATL.
+// The poller is covered by useLiveScores*.test.tsx; here it says the first
+// tile shows KC @ ATL, pinned in the rail.
 const mockKcAtl = parseScoreboard(JSON.parse(JSON.stringify(recorded)))![0];
 jest.mock("@/hooks/useLiveScores", () => ({
   useLiveScores: (tiles: { key: string }[]) => ({
-    tiles: new Map<string, TileScore>(
-      tiles.length > 0
-        ? [[tiles[0].key, { kind: "game", game: mockKcAtl, via: "title" }]]
-        : [],
-    ),
+    tiles: new Map(),
     games: [],
+    view:
+      tiles.length > 0
+        ? {
+            status: "ok",
+            pinned: [
+              {
+                tileKey: tiles[0].key,
+                color: "#60a5fa",
+                gameId: mockKcAtl.id,
+                teams: { away: "KC", home: "ATL" },
+                game: mockKcAtl,
+              },
+            ],
+            others: [],
+            delaySeconds: 30,
+          }
+        : null,
   }),
 }));
 
@@ -147,21 +159,23 @@ beforeEach(() => {
 });
 
 describe("live scores on the multiview screen", () => {
-  // A1
-  test("draws the score over the tiles and keeps it when the toolbar hides", async () => {
+  // R1 (v1's A1, now for the rail)
+  test("draws the scores rail and keeps it when the toolbar hides", async () => {
     jest.useFakeTimers();
     try {
       await render(<MultiviewRoute />);
-      expect(screen.getByTestId("score-bug")).toBeTruthy();
+      expect(screen.getByTestId("scores-rail")).toBeTruthy();
       expect(screen.getByText("KC")).toBeTruthy();
+      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
       expect(screen.getByLabelText("multiview.change_layout")).toBeTruthy();
 
       await act(async () => {
         await jest.advanceTimersByTimeAsync(10_000);
       });
-      // The toolbar has gone; the bug has not.
+      // The toolbar has gone; the rail and the tag have not.
       expect(screen.queryByLabelText("multiview.change_layout")).toBeNull();
-      expect(screen.getByTestId("score-bug")).toBeTruthy();
+      expect(screen.getByTestId("scores-rail")).toBeTruthy();
+      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
     } finally {
       jest.useRealTimers();
     }

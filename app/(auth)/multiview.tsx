@@ -482,8 +482,8 @@ function MultiviewScreen() {
       >
         <MultiviewScoreLayer
           tiles={scoreSlots}
-          scores={liveScores.tiles}
-          statsTiles={statsTiles}
+          area={area}
+          view={liveScores.view}
         />
       </View>
 

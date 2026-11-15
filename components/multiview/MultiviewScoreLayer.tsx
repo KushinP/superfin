@@ -1,39 +1,32 @@
-import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Text } from "@/components/common/Text";
-import type { TileScore } from "@/hooks/useLiveScores";
+import type { LiveScoresView } from "@/utils/atoms/liveScores";
+import { placeRail } from "@/utils/livescores/railLayout";
 import type { TileFrame } from "@/utils/multiview/multiview";
-import { ScoreBug } from "./ScoreBug";
+import { ScoresRail } from "./ScoresRail";
 
-const UNAVAILABLE_KEYS = {
-  network: "livescores.unavailable_network",
-  format: "livescores.unavailable_format",
-  stale: "livescores.unavailable_stale",
-} as const;
+/** How tall a pinned tile's colour tag is, along its top edge. */
+const TAG_HEIGHT = 3;
 
 interface Props {
   tiles: { key: string; frame: TileFrame }[];
-  scores: ReadonlyMap<string, TileScore>;
-  /** Tiles with their stats on: only there is "Scores unavailable" shown. */
-  statsTiles: ReadonlySet<string>;
+  /** The multiview area the frames are laid out in. */
+  area: { width: number; height: number };
+  view: LiveScoresView | null;
 }
 
 /**
- * The score bugs, drawn over the multiview tiles rather than inside them, so
- * a score changing never re-renders a tile or touches its player. It takes
- * no touches or remote presses, and does not hide with the toolbar.
+ * Live scores over multiview: the rail, in the black band below the tiles
+ * when there is one, and a colour tag along the top of each tile whose game
+ * is pinned in it. Its own layer over the tiles, not inside them, so a score
+ * changing never re-renders a tile or touches its player; it takes no
+ * touches or remote presses.
  */
-export function MultiviewScoreLayer({ tiles, scores, statsTiles }: Props) {
-  const { t } = useTranslation();
-  const slots = tiles.flatMap(({ key, frame }) => {
-    const score = scores.get(key);
-    if (!score) return [];
-    // An outage is said only where Kush looks into a tile on purpose; over
-    // a game it would just be noise.
-    if (score.kind === "unavailable" && !statsTiles.has(key)) return [];
-    return [{ key, frame, score }];
-  });
-  if (slots.length === 0) return null;
+export function MultiviewScoreLayer({ tiles, area, view }: Props) {
+  if (!view) return null;
+  const rail = placeRail(
+    tiles.map((t) => t.frame),
+    area,
+  );
 
   return (
     <View
@@ -41,47 +34,37 @@ export function MultiviewScoreLayer({ tiles, scores, statsTiles }: Props) {
       pointerEvents='none'
       style={StyleSheet.absoluteFill}
     >
-      {slots.map(({ key, frame, score }) => (
+      {view.pinned.map((pinned) => {
+        const frame = tiles.find((t) => t.key === pinned.tileKey)?.frame;
+        if (!frame) return null;
+        return (
+          <View
+            key={pinned.tileKey}
+            testID={`tile-tag-${pinned.tileKey}`}
+            style={{
+              position: "absolute",
+              left: frame.left,
+              top: frame.top,
+              width: frame.width,
+              height: TAG_HEIGHT,
+              backgroundColor: pinned.color,
+            }}
+          />
+        );
+      })}
+      {rail && (
         <View
-          key={key}
-          testID={`score-slot-${key}`}
+          testID='rail-slot'
           style={{
             position: "absolute",
-            left: frame.left,
-            top: frame.top,
-            width: frame.width,
-            height: frame.height,
+            left: rail.left,
+            top: rail.top,
+            width: rail.width,
           }}
         >
-          <View style={styles.corner}>
-            {score.kind === "game" ? (
-              <ScoreBug game={score.game} />
-            ) : (
-              <View style={styles.unavailable}>
-                <Text className='text-xs text-neutral-300'>
-                  {t(UNAVAILABLE_KEYS[score.reason])}
-                </Text>
-              </View>
-            )}
-          </View>
+          <ScoresRail view={view} width={rail.width} />
         </View>
-      ))}
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  // Top left: the name label is bottom left and the ••• button top right.
-  corner: {
-    position: "absolute",
-    left: 6,
-    top: 6,
-    maxWidth: "80%",
-  },
-  unavailable: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-});
