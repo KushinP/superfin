@@ -125,5 +125,3 @@ What would confirm it: on a game day, Kush glances at the rail instead of his ph
 - **Unofficial ESPN fields.** The leaders, last play, win probability and drive fields come from the same unofficial feed and can change. Each detail is optional, and a missing one is left out (R6).
 - **Merges with #12's menu changes.** The tile menu item changes name and job. develop's screen tests cover the menu order.
 - **Fire TV look.** "Glass" on Android TV is a see-through dark panel. True blur isn't available there.
-
----
