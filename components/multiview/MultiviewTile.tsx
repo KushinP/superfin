@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   findNodeHandle,
+  type HWEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -25,6 +26,7 @@ import {
   MULTIVIEW_STALL_DELAY,
 } from "@/constants/Multiview";
 import { useMultiviewTileStream } from "@/hooks/useMultiviewTileStream";
+import { useTVEventHandler } from "@/hooks/useTVEventHandler";
 import { ExoPlayerView, MpvPlayerView, type MpvPlayerViewRef } from "@/modules";
 import { apiAtom, userAtom } from "@/utils/atoms/api";
 import {
@@ -341,14 +343,37 @@ export function MultiviewTile({
       !ended &&
       (!playing || seeking || (stalled && !paused)));
   // A live channel has no pause, no skip and no captions to offer here.
-  const hasControls =
-    showLabel &&
-    !ended &&
-    state.status === "ready" &&
-    state.item.Type !== "TvChannel";
+  const canControl =
+    !ended && state.status === "ready" && state.item.Type !== "TvChannel";
+  const hasControls = showLabel && canControl;
   const next = nextEpisode.data;
 
   const { focused, onFocus, onBlur } = useFocused(onFocusChange);
+
+  // The remote's playback keys act on the tile it is on. The on-screen
+  // buttons are out of a TV remote's reach: they sit inside the tile's own
+  // focus target, and Android's focus search only moves to its neighbours,
+  // so on a Fire TV play, pause, forward and rewind did nothing.
+  const remoteKey = useRef<(evt: HWEvent) => void>(() => {});
+  remoteKey.current = (evt) => {
+    if (!focused || !canControl) return;
+    // One press, one action: the release comes as a second event.
+    if (evt.eventKeyAction !== undefined && evt.eventKeyAction !== 0) return;
+    const player = playerRef.current;
+    if (evt.eventType === "playPause") {
+      control(() => void (paused ? player?.play() : player?.pause()))();
+    } else if (evt.eventType === "play") {
+      control(() => void player?.play())();
+    } else if (evt.eventType === "pause") {
+      control(() => void player?.pause())();
+    } else if (evt.eventType === "rewind") {
+      control(() => void player?.seekBy(-MULTIVIEW_SEEK_BACK_SECONDS))();
+    } else if (evt.eventType === "fastForward") {
+      control(() => void player?.seekBy(MULTIVIEW_SEEK_FORWARD_SECONDS))();
+    }
+  };
+  const onRemoteKey = useCallback((evt: HWEvent) => remoteKey.current(evt), []);
+  useTVEventHandler(onRemoteKey);
 
   return (
     <View
