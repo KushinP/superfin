@@ -65,3 +65,33 @@ Later: make ExoPlayerView survive a brief detach (P2 below).
 
 ## 7. Open questions
 - None that change the plan. Default: the order tiles were added is the draw order.
+
+## Changes
+- **2026-11-15, addendum (approved by Kush: "approve"): the real cause is native.**
+  - **What the device test found.** The Fire TV test of PR #10's CI build, run by the "Jellyfin live TV server troubleshooting (fork)" session, showed tiles still reconnect. Kush: "Basically anytime I do the hold down on the tile, not even click anything it auto reconnects".
+  - **The log.** It shows both tile players released (`ExoPlayerImpl: Release`) at the moment of the long-press, before any option is chosen. The app is reported as backgrounded, and the stall rule reopens both channels about 16 s later.
+  - **The cause.** Anything that takes a tile's view off the window releases its player: the long-press menu, and possibly re-ordering. `ExoPlayerView.onDetachedFromWindow()` calls `destroy()`, and nothing rebuilds the player when the view comes back. The draw-order fix stays, since it is still correct, but it is not enough.
+  - **New requirement (P0).** On Android, a player view taken off the window and put back keeps its player and stream. The player is released only when React really removes the view.
+  - **New acceptance checks.**
+    9. Given multiview on Android TV with two live tiles, when a tile is long-pressed and the menu dismissed, then both tiles keep playing: no `ExoPlayerImpl: Release` in logcat, and no new `master.m3u8` request or stream in Jellyfin. **By hand, on the Fire TV.**
+    10. Given a tile that is removed, or the multiview screen closed, then its player is released (logcat `ExoPlayerImpl: Release` per tile) and Jellyfin logs the stop. **By hand.**
+    11. **Must not change:** given the full-screen player on Android TV, when the user leaves it (Back, end of video, next episode), then the player is released and nothing keeps playing in the background. **By hand.**
+- **2026-11-15, addendum 2 (approved by Kush: "approve"): the tile menu on TV.**
+  - **Problem.** Kush: "The drawer also look shit if we can do anything about that".
+    - On TV, a long-press opens the phone action sheet: a white panel over the bottom ~60% of the screen, with black left-aligned text and a red "Remove".
+    - It has no title and no visible remote focus.
+    - The area above it went black because the players had been released (addendum 1).
+  - **Requirement (P0).** On TV, the tile's long-press opens the app's TV menu, the same one multiview's quality picker already uses on TV (`useTVOptionModal`).
+    - It's a dark blurred panel whose title is the tile's channel or show name.
+    - It offers the same five actions: Make main, Quality (with the current quality as a sublabel), Show or Hide stats, Reconnect, Remove.
+    - The focused option is shown in white (TV rule: no coloured focus), and Back closes it with nothing changed.
+    - Phones, the iPad and the Mac keep the action sheet.
+  - **Non-goals.**
+    - **Icons and a red "Remove":** the shared TV menu has neither, and adding them changes every TV menu in the app (P2).
+    - **A custom panel drawn over the tiles:** the repo's TV rules forbid absolutely positioned overlays on TV, because Back doesn't work with them (`docs/conventions/tv.md`, `tv-modals-must-use-navigation-pattern`).
+  - **Acceptance checks.**
+    12. Given TV, when a tile is long-pressed, then the TV menu opens, titled with that tile's name, and the action sheet does not. **Automated.**
+    13. Given the TV menu, when each option is chosen, then it does what the action sheet option did (make main, quality picker, stats, reconnect, remove). **Automated.**
+    14. Given the TV menu, when Back is pressed, then nothing changes and focus returns to the tile. **By hand, on the Fire TV.** Jest can't press a TV remote.
+    15. Given a phone, when a tile is long-pressed, then the action sheet still opens (must not change). **Automated.**
+    16. Given the TV menu open over two live tiles, then both keep playing behind it. With addendum 1 the players aren't released. **By hand, on the Fire TV.**
