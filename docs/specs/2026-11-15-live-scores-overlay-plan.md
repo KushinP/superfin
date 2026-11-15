@@ -275,3 +275,4 @@ Checked:
 - 2026-11-15, test-gate: the A6 test lives in components/multiview/multiviewScores.test.tsx (the real screen with stand-in tiles, counting tile builds) and components/multiview/useLiveScoresMenu.test.ts, not the planned multiviewScoreMenu.test.tsx. A1's "stays when the toolbar hides" is checked there too.
 - 2026-11-15, test-gate: develop has since gained PR #10, whose components/multiview/multiviewScreen.test.tsx picks Remove as menu option 4. Merging this branch moves Remove to 5, so that test's REMOVE constant must change with the merge.
 
+- 2026-11-15, merging develop (#10, #11): develop gave the TV its own tile menu in place of the phone action sheet. Live scores is a "scores" tile action in both menus, before Remove, and its delay sheet opens the TV menu on a TV. The note above about develop's screen test is done in the merge commit.
