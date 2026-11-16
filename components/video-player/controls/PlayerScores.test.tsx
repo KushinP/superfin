@@ -85,8 +85,25 @@ describe("the TV player's live scores", () => {
     expect(screen.queryByTestId("player-scores-button")).toBeNull();
   });
 
-  // S9
-  test("scores off: no rail and no Scores button", async () => {
+  // Kush, 2026-11-16: turning scores off must leave a way to turn them on.
+  test("scores off: no rail, but the Scores button stays", async () => {
+    await renderWith(
+      <>
+        <PlayerScoresRail isLiveTV width={1824} />
+        <PlayerScoresButton
+          isLiveTV
+          onPress={jest.fn()}
+          focusable
+          hasTVPreferredFocus={false}
+        />
+      </>,
+      { ...view, status: "off", followed: [], others: [] },
+    );
+    expect(screen.queryByTestId("scores-rail")).toBeNull();
+    expect(screen.getByTestId("player-scores-button")).toBeTruthy();
+  });
+
+  test("not on a live channel's screen at all (no view): nothing", async () => {
     await renderWith(
       <>
         <PlayerScoresRail isLiveTV width={1824} />

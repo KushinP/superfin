@@ -174,12 +174,20 @@ describe("useLiveScores", () => {
   });
 
   // S9
-  test("with the setting off, asks ESPN nothing and has no view", async () => {
+  // Kush, 2026-11-16: turning scores off left no way back on screen, so the
+  // view says "off" and the Scores button stays; nothing is fetched.
+  test("with the setting off, asks ESPN nothing and the view says off", async () => {
     mockSettings.liveScoresEnabled = false;
     const { result } = await render();
     await advance(120);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(view(result)).toBeNull();
+    expect(view(result)).toEqual({
+      status: "off",
+      waiting: false,
+      followed: [],
+      others: [],
+      delaySeconds: 30,
+    });
   });
 
   // S9: the player on a movie

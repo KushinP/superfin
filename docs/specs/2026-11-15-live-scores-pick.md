@@ -105,3 +105,7 @@ Kush, after the Fire TV test on 2026-11-15: "Would it not make sense for it to j
 1. **Single view rail: always visible, or only with the controls?** Default: with the controls, so it never covers the picture uninvited.
 2. **Follow limit.** Default: 2, matching the 2 tuners.
 3. **Delay on every game.** Default: yes.
+
+## Changes
+
+- 2026-11-16, S9 changed by Kush ("first one"). Turning scores off from the Scores screen left no way to turn them back on there: the button and the screen disappeared. With scores off, the Scores button now stays, and the screen offers only "Turn live scores on". The rail stays hidden and nothing is fetched. The view gains a status, "off".

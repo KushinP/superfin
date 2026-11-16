@@ -78,7 +78,7 @@ jest.mock("@/utils/atoms/settings", () => {
 // The poller is covered by useLiveScores.test.tsx; here it says KC @ ATL
 // is being played.
 const mockKcAtl = parseScoreboard(JSON.parse(JSON.stringify(recorded)))![0];
-/** False: scores are off, so there is no view (S9). */
+/** False: scores are turned off, so the view says "off" (S9, as changed). */
 let mockHasView = true;
 jest.mock("@/hooks/useLiveScores", () => ({
   useLiveScores: () => ({
@@ -90,7 +90,13 @@ jest.mock("@/hooks/useLiveScores", () => ({
           others: [mockKcAtl],
           delaySeconds: 30,
         }
-      : null,
+      : {
+          status: "off",
+          waiting: false,
+          followed: [],
+          others: [],
+          delaySeconds: 30,
+        },
   }),
 }));
 
@@ -197,14 +203,13 @@ describe("live scores on the multiview screen", () => {
   });
 
   // S9
-  test("with scores off: no rail, no Scores button or item", async () => {
+  // Kush, 2026-11-16: turning scores off left no way back, so with scores
+  // off the rail goes but the Scores button stays, to turn them back on.
+  test("with scores off: no rail, but the Scores button stays", async () => {
     mockHasView = false;
     await render(<MultiviewRoute />);
     expect(screen.queryByTestId("scores-rail")).toBeNull();
-    expect(screen.queryByLabelText("livescores.open_scores")).toBeNull();
-    await act(() => mockTileProps.a.onLongPress());
-    expect(mockSheets[0].options).not.toContain("livescores.open_scores");
-    expect(mockSheets[0].options).toContain("multiview.remove_tile");
+    expect(screen.getByLabelText("livescores.open_scores")).toBeTruthy();
   });
 
   test("Remove is still the tile menu's destructive option, below Scores", async () => {

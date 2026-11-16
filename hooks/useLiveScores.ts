@@ -78,11 +78,13 @@ type Reason = NonNullable<LiveScoresView["reason"]>;
  * names no teams, and its score vanished. Every game is shown, and the
  * viewer picks theirs on the scores screen.
  *
- * Nothing is fetched while `active` is false or scores are turned off.
+ * Nothing is fetched while `active` is false or scores are turned off. While
+ * they're off the view says so, so the screen keeps a way to turn them on.
  */
 export const useLiveScores = (active: boolean) => {
   const { settings } = useSettings();
-  const enabled = active && settings.liveScoresEnabled !== false;
+  const turnedOn = settings.liveScoresEnabled !== false;
+  const enabled = active && turnedOn;
   const delayMs =
     clampDelaySeconds(
       settings.liveScoresDelaySeconds ?? LIVE_SCORES_DELAY_DEFAULT_S,
@@ -166,7 +168,16 @@ export const useLiveScores = (active: boolean) => {
 
   const delaySeconds = delayMs / 1000;
   const view = useMemo((): LiveScoresView | null => {
-    if (!enabled) return null;
+    if (!active) return null;
+    if (!turnedOn) {
+      return {
+        status: "off",
+        waiting: false,
+        followed: [],
+        others: [],
+        delaySeconds,
+      };
+    }
     if (unavailableReason) {
       return {
         status: "unavailable",
@@ -192,7 +203,7 @@ export const useLiveScores = (active: boolean) => {
       ...splitFollowed(shown.data, followedIds),
       delaySeconds,
     };
-  }, [enabled, unavailableReason, shown, followedIds, delaySeconds]);
+  }, [active, turnedOn, unavailableReason, shown, followedIds, delaySeconds]);
 
   const setView = useSetAtom(liveScoresViewAtom);
   useEffect(() => {
