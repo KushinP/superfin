@@ -5,20 +5,18 @@ import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { toast } from "sonner-native";
 import { useIntegrationHeaders } from "@/hooks/useIntegrationHeaders";
-import { SeerrApi, useSeerr } from "@/hooks/useSeerr";
+import { useSeerr } from "@/hooks/useSeerr";
 import { apiAtom, userAtom } from "@/providers/JellyfinProvider";
 import { useSettings } from "@/utils/atoms/settings";
-import { markExpectedError } from "@/utils/errors";
 import { writeErrorLog } from "@/utils/log";
 import { storage } from "@/utils/mmkv";
 import { deleteSeerrPassword } from "@/utils/seerrPassword";
 import {
   isQuickConnectEnabled,
   seerrPasswordNeeded,
-  signInWithQuickConnect,
 } from "@/utils/seerrQuickConnect";
+import { signInToSeerr } from "@/utils/seerrSignIn";
 import { seerrProbe } from "@/utils/serverUrl/probes/seerr";
-import { resolveServerUrl } from "@/utils/serverUrl/resolve";
 import { store } from "@/utils/store";
 import { Button } from "../Button";
 import { Input } from "../common/Input";
@@ -71,96 +69,25 @@ export const SeerrSettings = () => {
     useIntegrationHeaders("seerr");
 
   const loginToSeerrMutation = useMutation({
-    mutationFn: async () => {
-      // Everything thrown in this mutation is a user-facing outcome of what
-      // they typed (or didn't) — surfaced by onError's toast, never Sentry.
-      if (!user?.Name)
-        throw markExpectedError(
-          new Error("Missing required information for login"),
-        );
-
-      // When the URL is admin-pinned, target that server directly. Otherwise
-      // trust resolvedUrl only while it matches the field (the field adopts
-      // the canonical URL after a successful resolve); any other input is
-      // resolved fresh here, so tapping Login right after editing can never
-      // silently target the previous server.
-      let finalUrl = "";
-      if (urlLocked) {
-        finalUrl = settings?.seerrServerUrl ?? "";
-      } else if (resolvedUrl && resolvedUrl === seerrServerUrl) {
-        finalUrl = resolvedUrl;
-      } else if (seerrServerUrl) {
-        const resolved = await resolveServerUrl(seerrServerUrl, seerrProbe, {
-          headers: customHeaders,
-        });
-        if (!resolved.ok)
-          throw markExpectedError(new Error("Invalid server url"));
-        finalUrl = resolved.url;
-      }
-      if (!finalUrl) throw markExpectedError(new Error("Missing server url"));
-
-      // An API key signs in via the Seerr account linked to the Jellyfin user
-      // — no password involved. Falls back to the classic password login.
-      const apiKey = apiKeyLocked
-        ? settings?.seerrApiKey
-        : seerrApiKeyInput.trim() || undefined;
-
-      const seerrTempApi = new SeerrApi(finalUrl, customHeaders, apiKey);
-      const testResult = await seerrTempApi.test();
-      if (!testResult.isValid)
-        throw markExpectedError(new Error("Invalid server url"));
-
-      const startedFor = user.Id;
-      const stillCurrent = () => store.get(userAtom)?.Id === startedFor;
-
-      // Quick Connect before either credential: it needs neither, and when it
-      // opens a session there is no reason for a key or a password to be on
-      // this device at all.
-      if (api) {
-        const quickConnected = await signInWithQuickConnect(
-          seerrTempApi,
-          api,
-          stillCurrent,
-        );
-        if (quickConnected)
-          return {
-            user: quickConnected,
-            url: finalUrl,
-            // A key the plugin locked stays the plugin's to manage. One typed
-            // here is dropped, because nothing reads it any more.
-            apiKey: apiKeyLocked ? apiKey : undefined,
-          };
-      }
-
-      // Neither credential for an account that has since been left: replayed
-      // now, it would sign the next user in as the previous one.
-      if (!stillCurrent())
-        throw markExpectedError(new Error("Signed-in account changed"));
-
-      if (apiKey) {
-        if (!user.Id)
-          throw markExpectedError(
-            new Error("Missing required information for login"),
-          );
-        const loggedInUser = await seerrTempApi.loginWithApiKey(user.Id);
-        return { user: loggedInUser, url: finalUrl, apiKey };
-      }
-
-      // The form did not ask for a password and Quick Connect did not sign
-      // in. Seerr hands the password to Jellyfin as a login for the user's
-      // own account, so the empty one would be a failed login there, counted
-      // towards the account's lockout. Failing here brings the field up
-      // instead. Once it is on screen an empty password is sent as typed: a
-      // Jellyfin account can have none.
-      if (!seerrPassword && !askPassword)
-        throw markExpectedError(new Error("Password needed"));
-
-      const loggedInUser = await seerrTempApi.login(
-        user.Name,
-        seerrPassword || "",
-      );
-      return { user: loggedInUser, url: finalUrl, apiKey: undefined };
-    },
+    mutationFn: () =>
+      signInToSeerr({
+        user,
+        api,
+        typedUrl: seerrServerUrl,
+        resolvedUrl,
+        savedUrl: settings?.seerrServerUrl,
+        urlLocked,
+        customHeaders,
+        // An API key signs in via the Seerr account linked to the Jellyfin
+        // user — no password involved.
+        apiKey: apiKeyLocked
+          ? settings?.seerrApiKey
+          : seerrApiKeyInput.trim() || undefined,
+        apiKeyLocked,
+        password: seerrPassword,
+        askedForPassword: askPassword,
+        currentUserId: () => store.get(userAtom)?.Id,
+      }),
     onSuccess: ({ user: loggedInUser, url, apiKey }) => {
       setSignInFailed(false);
       setSeerrUser(loggedInUser);

@@ -48,6 +48,7 @@ export function ScoresRail({ view, width }: Props) {
   }, [pages]);
 
   const unavailable = view.status === "unavailable";
+  if (view.status === "off") return null;
   if (!unavailable && !hasLiveGame([...view.followed, ...view.others])) {
     return null;
   }

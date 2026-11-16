@@ -208,4 +208,19 @@ describe("ScoresPanel", () => {
     await render(<ScoresPanel view={view({ followed: [] })} />);
     expect(screen.queryAllByTestId(/^details-/)).toHaveLength(0);
   });
+
+  // Kush, 2026-11-16: "when i clicked turn live off it never came back or an
+  // option to turn back on".
+  test("scores off: offers only Turn on, which turns them back on", async () => {
+    mockSettings = { liveScoresEnabled: false, liveScoresDelaySeconds: 30 };
+    await render(
+      <ScoresPanel view={view({ status: "off", followed: [], others: [] })} />,
+    );
+    expect(screen.getByText("livescores.off_status")).toBeTruthy();
+    expect(screen.queryByText("livescores.delay_more")).toBeNull();
+    await fireEvent.press(screen.getByText("livescores.turn_on"));
+    expect(mockUpdateSettings).toHaveBeenCalledWith({
+      liveScoresEnabled: true,
+    });
+  });
 });

@@ -116,4 +116,14 @@ describe("ScoresRail", () => {
     );
     expect(screen.queryByTestId("scores-rail")).toBeNull();
   });
+
+  test("scores turned off: no rail", async () => {
+    await render(
+      <ScoresRail
+        view={view({ status: "off", followed: [], others: [] })}
+        width={944}
+      />,
+    );
+    expect(screen.queryByTestId("scores-rail")).toBeNull();
+  });
 });

@@ -234,6 +234,25 @@ export function ScoresPanel({ view }: { view: LiveScoresView }) {
     });
   };
 
+  // Scores are off: the one thing to offer is turning them back on, here
+  // where they were turned off.
+  if (view.status === "off") {
+    return (
+      <View style={styles.panel}>
+        <View style={styles.controls}>
+          <Text className='text-sm text-neutral-300' style={styles.status}>
+            {t("livescores.off_status")}
+          </Text>
+          <PanelButton
+            label={t("livescores.turn_on")}
+            onPress={() => updateSettings({ liveScoresEnabled: true })}
+            hasTVPreferredFocus
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.panel}>
       <View style={styles.controls}>
