@@ -23,8 +23,16 @@ jest.mock("@/hooks/useTVBackPress", () => ({
     mockBackHandler = handler;
   },
 }));
+/** The remote key handler the hook gave useTVEventHandler. */
+let mockTVKeys:
+  | ((evt: { eventType: string; eventKeyAction?: number }) => void)
+  | undefined;
 jest.mock("@/hooks/useTVEventHandler", () => ({
-  useTVEventHandler: () => undefined,
+  useTVEventHandler: (
+    handler: (evt: { eventType: string; eventKeyAction?: number }) => void,
+  ) => {
+    mockTVKeys = handler;
+  },
 }));
 
 const pressBack = async (props: { showControls?: boolean } = {}) => {
@@ -50,6 +58,7 @@ afterEach(() => jest.restoreAllMocks());
 beforeEach(() => {
   mockConfirmBeforeStopping = true;
   mockBackHandler = undefined;
+  mockTVKeys = undefined;
   jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 });
 
@@ -84,5 +93,47 @@ describe("pressing back with the controls visible", () => {
     expect(onHideControls).toHaveBeenCalledTimes(1);
     expect(onBack).not.toHaveBeenCalled();
     expect(Alert.alert).not.toHaveBeenCalled();
+  });
+});
+
+// Fire TV, 2026-11-15: in single view ⏯ worked but ⏪ and ⏩ did nothing.
+// The player only knew the arrow keys; the remote's own seek keys arrive
+// as "rewind" and "fastForward".
+describe("the remote's ⏪ and ⏩ keys", () => {
+  const renderSeek = async (showControls: boolean) => {
+    const onMinimalSeekLeft = jest.fn();
+    const onMinimalSeekRight = jest.fn();
+    await renderHook(() =>
+      useRemoteControl({
+        showControls,
+        toggleControls: jest.fn(),
+        onMinimalSeekLeft,
+        onMinimalSeekRight,
+      }),
+    );
+    return { onMinimalSeekLeft, onMinimalSeekRight };
+  };
+
+  test.each([
+    ["hidden", false],
+    ["showing", true],
+  ])("seek back and forward with the controls %s", async (_, showControls) => {
+    const { onMinimalSeekLeft, onMinimalSeekRight } =
+      await renderSeek(showControls);
+
+    mockTVKeys?.({ eventType: "rewind", eventKeyAction: 0 });
+    mockTVKeys?.({ eventType: "fastForward", eventKeyAction: 0 });
+
+    expect(onMinimalSeekLeft).toHaveBeenCalledTimes(1);
+    expect(onMinimalSeekRight).toHaveBeenCalledTimes(1);
+  });
+
+  test("one seek per press, not on the release", async () => {
+    const { onMinimalSeekLeft } = await renderSeek(false);
+
+    mockTVKeys?.({ eventType: "rewind", eventKeyAction: 0 });
+    mockTVKeys?.({ eventType: "rewind", eventKeyAction: 1 });
+
+    expect(onMinimalSeekLeft).toHaveBeenCalledTimes(1);
   });
 });
