@@ -1573,7 +1573,7 @@
     "settings_enabled": "Live scores on multiview tiles",
     "settings_delay": "Score delay",
     "settings_delay_value": "{{seconds}} s",
-    "delay_status": "Your games show {{seconds}} s behind live",
+    "delay_status": "Scores show {{seconds}} s behind live",
     "waiting": "The score shows {{seconds}} s behind live, in a moment.",
     "last_play": "Last play: {{text}}",
     "win_probability": "Chance to win: {{away}} {{awayPct}}%, {{home}} {{homePct}}%",
@@ -1582,6 +1582,9 @@
     "leader_passing": "Passing: {{name}}, {{line}}",
     "leader_rushing": "Rushing: {{name}}, {{line}}",
     "leader_receiving": "Receiving: {{name}}, {{line}}",
-    "open_scores": "Scores"
+    "open_scores": "Scores",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "follow_limit": "Unfollow a game to follow this one"
   }
 }

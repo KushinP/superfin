@@ -1,5 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
-import type { LiveScoresView } from "@/utils/atoms/liveScores";
+import {
+  fireEvent,
+  render as rtlRender,
+  screen,
+  within,
+} from "@testing-library/react-native";
+import { createStore, Provider } from "jotai";
+import type { ReactElement } from "react";
+import {
+  followedGameIdsAtom,
+  type LiveScoresView,
+} from "@/utils/atoms/liveScores";
 import details from "@/utils/livescores/__fixtures__/scoreboard-details-2026-11-15.json";
 import { parseScoreboard } from "@/utils/livescores/espnScoreboard";
 import { ScoresPanel } from "./ScoresPanel";
@@ -13,6 +23,10 @@ jest.mock("react-i18next", () => ({
 
 let mockSettings: Record<string, unknown> = {};
 const mockUpdateSettings = jest.fn();
+const mockWriteDebugLog = jest.fn();
+jest.mock("@/utils/log", () => ({
+  writeDebugLog: (...args: unknown[]) => mockWriteDebugLog(...args),
+}));
 jest.mock("@/utils/atoms/settings", () => ({
   useSettings: () => ({
     settings: mockSettings,
@@ -33,8 +47,17 @@ const view = (more: Partial<LiveScoresView> = {}): LiveScoresView => ({
   ...more,
 });
 
+/** A fresh store per test, holding the follows the panel reads and sets. */
+let store = createStore();
+const render = (ui: ReactElement) =>
+  rtlRender(<Provider store={store}>{ui}</Provider>);
+const follows = () => store.get(followedGameIdsAtom);
+
 describe("ScoresPanel", () => {
   beforeEach(() => {
+    store = createStore();
+    store.set(followedGameIdsAtom, [byAway("SEA").id]);
+    mockWriteDebugLog.mockClear();
     mockSettings = { liveScoresEnabled: true, liveScoresDelaySeconds: 30 };
     mockUpdateSettings.mockReset();
   });
@@ -42,28 +65,29 @@ describe("ScoresPanel", () => {
   // R6
   test("a followed game in full: score, clock, down, last play, odds, drive, timeouts, leaders", async () => {
     await render(<ScoresPanel view={view()} />);
-    // 7-7: both scores show.
-    expect(screen.getAllByText("7")).toHaveLength(2);
-    expect(screen.getByText(/^livescores\.quarter_clock:/)).toBeTruthy();
+    // 7-7: both scores show in its details.
+    const details = within(screen.getByTestId(`details-${byAway("SEA").id}`));
+    expect(details.getAllByText("7")).toHaveLength(2);
+    expect(details.getByText(/^livescores\.quarter_clock:/)).toBeTruthy();
     expect(
-      screen.getByText(
+      details.getByText(
         "livescores.last_play:(Shotgun) M.Washington up the middle to SEA 46 for no gain (D.Fowler).",
       ),
     ).toBeTruthy();
     expect(
-      screen.getByText("livescores.win_probability:SEA,68,LV,32"),
+      details.getByText("livescores.win_probability:SEA,68,LV,32"),
     ).toBeTruthy();
     expect(
-      screen.getByText("livescores.drive:3 plays, 19 yards, 1:20"),
+      details.getByText("livescores.drive:3 plays, 19 yards, 1:20"),
     ).toBeTruthy();
-    expect(screen.getByText("livescores.timeouts:SEA,3,LV,3")).toBeTruthy();
+    expect(details.getByText("livescores.timeouts:SEA,3,LV,3")).toBeTruthy();
     expect(
-      screen.getByText(
+      details.getByText(
         "livescores.leader_passing:D. Lock (SEA),2/2, 43 YDS, 1 TD",
       ),
     ).toBeTruthy();
-    expect(screen.getByText(/^livescores\.leader_rushing:/)).toBeTruthy();
-    expect(screen.getByText(/^livescores\.leader_receiving:/)).toBeTruthy();
+    expect(details.getByText(/^livescores\.leader_rushing:/)).toBeTruthy();
+    expect(details.getByText(/^livescores\.leader_receiving:/)).toBeTruthy();
   });
 
   // R6: a detail ESPN didn't give is left out, the rest stays.
@@ -143,5 +167,45 @@ describe("ScoresPanel", () => {
       .getAllByRole("button")
       .map((b) => b.props.style.width ?? b.props.style.minWidth);
     expect(new Set(widths).size).toBe(1);
+  });
+
+  // S3
+  test("selecting another game shows it in full, and Follow adds it", async () => {
+    const pit = byAway("PIT");
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByTestId(`select-${pit.id}`));
+    expect(screen.getByTestId(`details-${pit.id}`)).toBeTruthy();
+
+    await fireEvent.press(screen.getByText("livescores.follow"));
+    expect(follows()).toEqual([byAway("SEA").id, pit.id]);
+    expect(mockWriteDebugLog).toHaveBeenCalledWith(
+      "Live scores: follows changed",
+      { game: pit.id, followed: [byAway("SEA").id, pit.id] },
+    );
+  });
+
+  test("a followed game offers Unfollow, which removes it", async () => {
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByText("livescores.unfollow"));
+    expect(follows()).toEqual([]);
+  });
+
+  // S8
+  test("with two followed, Follow is off and says why", async () => {
+    store.set(followedGameIdsAtom, [byAway("SEA").id, "another"]);
+    const ne = byAway("NE");
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByTestId(`select-${ne.id}`));
+
+    const follow = screen.getByRole("button", { name: "livescores.follow" });
+    expect(follow.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByText("livescores.follow_limit")).toBeTruthy();
+    await fireEvent.press(follow);
+    expect(follows()).toEqual([byAway("SEA").id, "another"]);
+  });
+
+  test("with nothing followed and nothing selected, no game is shown in full", async () => {
+    await render(<ScoresPanel view={view({ followed: [] })} />);
+    expect(screen.queryAllByTestId(/^details-/)).toHaveLength(0);
   });
 });

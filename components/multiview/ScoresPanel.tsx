@@ -1,18 +1,28 @@
 import type { TFunction } from "i18next";
+import { useAtom } from "jotai";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/common/Text";
 import { MultiviewColors } from "@/constants/Colors";
-import { LIVE_SCORES_DELAY_DEFAULT_S } from "@/constants/LiveScores";
-import type { LiveScoresView } from "@/utils/atoms/liveScores";
+import {
+  LIVE_SCORES_DELAY_DEFAULT_S,
+  LIVE_SCORES_MAX_FOLLOWED,
+} from "@/constants/LiveScores";
+import {
+  followedGameIdsAtom,
+  type LiveScoresView,
+} from "@/utils/atoms/liveScores";
 import { useSettings } from "@/utils/atoms/settings";
 import {
   clampDelaySeconds,
   stepDelaySeconds,
 } from "@/utils/livescores/delayBuffer";
 import type { GameLeader, GameScore } from "@/utils/livescores/espnScoreboard";
+import { toggleFollow } from "@/utils/livescores/railItems";
+import { writeDebugLog } from "@/utils/log";
 import { gameStatusText } from "./gameStatusText";
-import { GameChip } from "./RailChip";
+import { FollowedChip, GameChip } from "./RailChip";
 import { useFocused } from "./useFocused";
 
 const UNAVAILABLE_KEYS = {
@@ -71,12 +81,12 @@ const detailLines = (t: TFunction, game: GameScore): string[] => {
   return lines;
 };
 
-/** A followed game in full: score, clock, down, then each detail ESPN gave. */
-function FollowedGame({ game }: { game: GameScore }) {
+/** A game in full: score, clock, down, then each detail ESPN gave. */
+function GameDetails({ game }: { game: GameScore }) {
   const { t } = useTranslation();
   const scores = game.state !== "pre";
   return (
-    <View testID={`followed-${game.id}`} style={styles.card}>
+    <>
       <View style={styles.scoreRow}>
         <Text className='text-base text-neutral-300 font-semibold'>
           {game.away.abbr}
@@ -104,7 +114,42 @@ function FollowedGame({ game }: { game: GameScore }) {
           {line}
         </Text>
       ))}
-    </View>
+    </>
+  );
+}
+
+/**
+ * A game in the list that opens its details when selected. Its focus shows
+ * as a white outline: the chip's light text would vanish on solid white.
+ */
+function SelectableGame({
+  game,
+  selected,
+  onSelect,
+  children,
+}: {
+  game: GameScore;
+  selected: boolean;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
+  const { focused, onFocus, onBlur } = useFocused();
+  return (
+    <Pressable
+      testID={`select-${game.id}`}
+      accessibilityRole='togglebutton'
+      accessibilityState={{ expanded: selected }}
+      onPress={onSelect}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      style={[
+        styles.selectable,
+        selected && styles.selected,
+        focused && styles.focusedGame,
+      ]}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -112,15 +157,19 @@ function PanelButton({
   label,
   onPress,
   hasTVPreferredFocus,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
   hasTVPreferredFocus?: boolean;
+  disabled?: boolean;
 }) {
   const { focused, onFocus, onBlur } = useFocused();
   return (
     <Pressable
       accessibilityRole='button'
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
       onPress={onPress}
       onFocus={onFocus}
       onBlur={onBlur}
@@ -130,6 +179,7 @@ function PanelButton({
         paddingVertical: 8,
         borderRadius: 8,
         alignItems: "center",
+        opacity: disabled ? 0.5 : 1,
         // Focused, solid white like multiview's toolbar buttons.
         backgroundColor: focused
           ? MultiviewColors.focusRing
@@ -148,10 +198,14 @@ function PanelButton({
 
 /**
  * The scores screen's content, the same on a phone sheet and the TV panel:
- * the spoiler delay and its controls, the followed games in full (last
- * play, win probability, drive, timeouts, leaders), then every other game.
- * Each detail shows only when ESPN gave it, and every game waits for the
- * delay.
+ * the spoiler delay and its controls, the followed games, every other game,
+ * and the selected game in full (last play, win probability, drive,
+ * timeouts, leaders) with Follow or Unfollow. The first followed game is
+ * selected until another is. Every game waits for the delay.
+ *
+ * The one Follow / Unfollow button stays put while its label changes, so
+ * the TV focus isn't lost: a button that vanished under it would leave
+ * Android TV with nothing focused.
  */
 export function ScoresPanel({ view }: { view: LiveScoresView }) {
   const { t } = useTranslation();
@@ -160,6 +214,25 @@ export function ScoresPanel({ view }: { view: LiveScoresView }) {
   const delay = clampDelaySeconds(
     settings.liveScoresDelaySeconds ?? LIVE_SCORES_DELAY_DEFAULT_S,
   );
+  const [followedIds, setFollowedIds] = useAtom(followedGameIdsAtom);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const games = [...view.followed, ...view.others];
+  const selected =
+    games.find((g) => g.id === selectedId) ?? view.followed[0] ?? null;
+  const isFollowed = !!selected && followedIds.includes(selected.id);
+  const atLimit = !isFollowed && followedIds.length >= LIVE_SCORES_MAX_FOLLOWED;
+
+  const toggle = (game: GameScore) => {
+    const next = toggleFollow(followedIds, game.id);
+    setFollowedIds(next);
+    // Keep it selected, so its button keeps the focus.
+    setSelectedId(game.id);
+    writeDebugLog("Live scores: follows changed", {
+      game: game.id,
+      followed: next,
+    });
+  };
 
   return (
     <View style={styles.panel}>
@@ -200,16 +273,53 @@ export function ScoresPanel({ view }: { view: LiveScoresView }) {
         </Text>
       ) : (
         <>
-          <View style={styles.yourGames}>
-            {view.followed.map((game) => (
-              <FollowedGame key={game.id} game={game} />
-            ))}
-          </View>
-          {view.others.length > 0 && (
-            <View style={styles.others}>
-              {view.others.map((game) => (
-                <GameChip key={game.id} game={game} />
+          {view.followed.length > 0 && (
+            <View style={styles.games}>
+              {view.followed.map((game) => (
+                <SelectableGame
+                  key={game.id}
+                  game={game}
+                  selected={selected?.id === game.id}
+                  onSelect={() => setSelectedId(game.id)}
+                >
+                  <FollowedChip game={game} />
+                </SelectableGame>
               ))}
+            </View>
+          )}
+          {view.others.length > 0 && (
+            <View style={styles.games}>
+              {view.others.map((game) => (
+                <SelectableGame
+                  key={game.id}
+                  game={game}
+                  selected={selected?.id === game.id}
+                  onSelect={() => setSelectedId(game.id)}
+                >
+                  <GameChip game={game} />
+                </SelectableGame>
+              ))}
+            </View>
+          )}
+          {selected && (
+            <View testID={`details-${selected.id}`} style={styles.card}>
+              <GameDetails game={selected} />
+              <View style={styles.followRow}>
+                <PanelButton
+                  label={
+                    isFollowed
+                      ? t("livescores.unfollow")
+                      : t("livescores.follow")
+                  }
+                  onPress={() => toggle(selected)}
+                  disabled={atLimit}
+                />
+                {atLimit && (
+                  <Text className='text-sm text-neutral-400'>
+                    {t("livescores.follow_limit")}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
         </>
@@ -231,14 +341,23 @@ const styles = StyleSheet.create({
   status: {
     flexGrow: 1,
   },
-  yourGames: {
+  games: {
     flexDirection: "row",
-    gap: 12,
     flexWrap: "wrap",
+    gap: 4,
+  },
+  selectable: {
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  selected: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  focusedGame: {
+    borderColor: MultiviewColors.focusRing,
   },
   card: {
-    flexGrow: 1,
-    flexBasis: 280,
     gap: 2,
     paddingLeft: 10,
     borderLeftWidth: 3,
@@ -251,9 +370,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginBottom: 2,
   },
-  others: {
+  followRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
   },
 });
