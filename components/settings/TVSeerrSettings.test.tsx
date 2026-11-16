@@ -77,6 +77,28 @@ jest.mock("@/components/tv", () => {
     ),
   };
 });
+// The login screen's field, as a plain input: what it's given is this
+// section's.
+jest.mock("@/components/login/TVInput", () => {
+  const { TextInput } = jest.requireActual("react-native");
+  return {
+    TVInput: (props: {
+      accessibilityLabel: string;
+      value: string;
+      onChangeText: (text: string) => void;
+      onEndEditing?: (e: { nativeEvent: { text: string } }) => void;
+      editable?: boolean;
+    }) => (
+      <TextInput
+        accessibilityLabel={props.accessibilityLabel}
+        value={props.value}
+        onChangeText={props.onChangeText}
+        onEndEditing={props.onEndEditing}
+        editable={props.editable}
+      />
+    ),
+  };
+});
 jest.mock("@/utils/atoms/api", () => {
   const { atom } = jest.requireActual("jotai");
   return {
@@ -255,6 +277,34 @@ describe("Seerr in the TV settings", () => {
     const field = screen.getByLabelText(URL_FIELD);
     expect(field.props.value).toBe(SEERR);
     expect(field.props.editable).toBe(false);
-    expect(screen.getByText("locked")).toBeTruthy();
+    expect(screen.getByText("home.settings.disabled_by_admin")).toBeTruthy();
+  });
+
+  // Fire TV, 2026-11-16: with Login disabled the remote skipped it, so
+  // there was no way to reach it. It stays reachable and says why.
+  test("Login with no address says to enter one, and signs in to nothing", async () => {
+    await renderSection();
+    await fireEvent.press(screen.getByLabelText(SIGN_IN));
+    expect(
+      screen.getByText("home.settings.plugins.seerr.enter_address"),
+    ).toBeTruthy();
+    expect(mockResolve).not.toHaveBeenCalled();
+    expect(
+      screen.getByLabelText(SIGN_IN).props.accessibilityState,
+    ).toMatchObject({
+      disabled: false,
+    });
+  });
+
+  // The Fire TV keyboard can leave the address in the field without a change
+  // event; the text it holds when editing ends is used.
+  test("uses the address the field holds when editing ends", async () => {
+    mockSignInWithQuickConnect.mockResolvedValue({ id: 7 });
+    await renderSection();
+    await fireEvent(screen.getByLabelText(URL_FIELD), "endEditing", {
+      nativeEvent: { text: SEERR },
+    });
+    await fireEvent.press(screen.getByLabelText(SIGN_IN));
+    await waitFor(() => expect(mockResolve).toHaveBeenCalledWith(SEERR));
   });
 });
