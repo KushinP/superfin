@@ -7,6 +7,8 @@ import {
 } from "@/utils/atoms/liveScores";
 import { ScoresScreenContent } from "./ScoresScreenContent";
 
+jest.mock("@/utils/log", () => ({ writeDebugLog: jest.fn() }));
+
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
@@ -23,7 +25,8 @@ jest.mock("@/utils/atoms/settings", () => ({
 const view: LiveScoresView = {
   status: "unavailable",
   reason: "network",
-  pinned: [],
+  waiting: false,
+  followed: [],
   others: [],
   delaySeconds: 30,
 };

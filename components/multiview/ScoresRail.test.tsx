@@ -26,15 +26,8 @@ const others = (count: number): GameScore[] =>
   }));
 const view = (more: Partial<LiveScoresView> = {}): LiveScoresView => ({
   status: "ok",
-  pinned: [
-    {
-      tileKey: "tile-0",
-      color: "#60a5fa",
-      gameId: kcAtl.id,
-      teams: { away: "KC", home: "ATL" },
-      game: kcAtl,
-    },
-  ],
+  waiting: false,
+  followed: [kcAtl],
   others: others(3),
   delaySeconds: 30,
   ...more,
@@ -44,13 +37,13 @@ const shownOthers = () =>
 
 describe("ScoresRail", () => {
   // R1
-  test("your game first, then the others in the order given", async () => {
+  test("the followed game first, then the others in the order given", async () => {
     await render(<ScoresRail view={view()} width={944} />);
     const chips = screen
       .getAllByTestId(/^rail-chip-/)
       .map((c) => c.props.testID);
     expect(chips).toEqual([
-      "rail-chip-pinned-tile-0",
+      `rail-chip-followed-${kcAtl.id}`,
       "rail-chip-g0",
       "rail-chip-g1",
       "rail-chip-g2",
@@ -58,10 +51,10 @@ describe("ScoresRail", () => {
   });
 
   // R3
-  test("pages the others every 8 s when they don't fit; your game stays", async () => {
+  test("pages the others every 8 s when they don't fit; the followed game stays", async () => {
     jest.useFakeTimers();
     try {
-      // 944 wide with one pinned game fits 6 of the others.
+      // 944 wide with one followed game fits 6 of the others.
       await render(
         <ScoresRail view={view({ others: others(14) })} width={944} />,
       );
@@ -87,7 +80,7 @@ describe("ScoresRail", () => {
         view={view({
           status: "unavailable",
           reason: "network",
-          pinned: [],
+          followed: [],
           others: [],
         })}
         width={944}
@@ -108,7 +101,18 @@ describe("ScoresRail", () => {
 
   test("with nothing to show, draws nothing", async () => {
     await render(
-      <ScoresRail view={view({ pinned: [], others: [] })} width={944} />,
+      <ScoresRail view={view({ followed: [], others: [] })} width={944} />,
+    );
+    expect(screen.queryByTestId("scores-rail")).toBeNull();
+  });
+
+  // S6: games to come and finals only, so nothing is being played.
+  test("with no game in play, draws nothing", async () => {
+    await render(
+      <ScoresRail
+        view={view({ followed: [], others: [board[2], board[3]] })}
+        width={944}
+      />,
     );
     expect(screen.queryByTestId("scores-rail")).toBeNull();
   });

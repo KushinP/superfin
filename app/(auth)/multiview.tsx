@@ -166,10 +166,8 @@ function MultiviewScreen() {
       ...(remoteStates[tile.key] ?? { controllable: false, focused: false }),
     })),
   );
-  // One scores poller for the whole screen, however many tiles show games.
-  const liveScores = useLiveScores(
-    state.tiles.map((tile) => ({ key: tile.key, itemId: tile.itemId })),
-  );
+  // One scores poller for the whole screen, whatever the tiles show.
+  const liveScores = useLiveScores(true);
   const openScores = useScoresScreen();
   // A closed TV option sheet or screen leaves Android TV with nothing
   // focused (see the android-tv-modal-close-loses-focus fact), so the
@@ -293,7 +291,7 @@ function MultiviewScreen() {
   statsRef.current = statsTiles;
   const openScoresRef = useRef(openScores);
   openScoresRef.current = openScores;
-  // Scores are offered only while a tile shows football (R10).
+  // Scores are offered whenever they're turned on (S9).
   const hasScoresRef = useRef(false);
   hasScoresRef.current = liveScores.view !== null;
 
@@ -437,9 +435,6 @@ function MultiviewScreen() {
     const index = state.tiles.findIndex((tile) => tile.key === key);
     return index === -1 ? [] : [{ tile: state.tiles[index], index }];
   });
-  const scoreSlots = state.tiles.flatMap((tile, i) =>
-    frames[i] ? [{ key: tile.key, frame: frames[i] }] : [],
-  );
 
   return (
     <View className='flex-1 bg-black'>
@@ -508,7 +503,7 @@ function MultiviewScreen() {
         }}
       >
         <MultiviewScoreLayer
-          tiles={scoreSlots}
+          frames={frames}
           area={area}
           view={liveScores.view}
         />

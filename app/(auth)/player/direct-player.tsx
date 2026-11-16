@@ -49,6 +49,7 @@ import { VideoPlayerView } from "@/components/video-player/VideoPlayerView";
 import { PROGRESS_REPORT_INTERVAL } from "@/constants/Playback";
 import useRouter from "@/hooks/useAppRouter";
 import { useHaptic } from "@/hooks/useHaptic";
+import { useLiveScores } from "@/hooks/useLiveScores";
 import { useMediaKeySession } from "@/hooks/useMediaKeySession";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useOrientation } from "@/hooks/useOrientation";
@@ -255,6 +256,11 @@ export default function DirectPlayerPage() {
     : BITRATES[0].value;
 
   const [item, setItem] = useState<BaseItemDto | null>(null);
+  // Live scores for a live channel on TV, the same feed multiview runs; the
+  // TV controls draw its rail and Scores button.
+  useLiveScores(
+    Platform.isTV && (item?.Type === "TvChannel" || item?.Type === "Program"),
+  );
   const initialSeekDoneRef = useRef(false);
 
   /** Position MPV is told to start from, see resolveStartTicks. */

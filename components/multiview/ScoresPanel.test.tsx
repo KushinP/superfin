@@ -1,10 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
-import type { LiveScoresView, PinnedGame } from "@/utils/atoms/liveScores";
-import details from "@/utils/livescores/__fixtures__/scoreboard-details-2026-11-15.json";
 import {
-  type GameScore,
-  parseScoreboard,
-} from "@/utils/livescores/espnScoreboard";
+  fireEvent,
+  render as rtlRender,
+  screen,
+  within,
+} from "@testing-library/react-native";
+import { createStore, Provider } from "jotai";
+import type { ReactElement } from "react";
+import {
+  followedGameIdsAtom,
+  type LiveScoresView,
+} from "@/utils/atoms/liveScores";
+import details from "@/utils/livescores/__fixtures__/scoreboard-details-2026-11-15.json";
+import { parseScoreboard } from "@/utils/livescores/espnScoreboard";
 import { ScoresPanel } from "./ScoresPanel";
 
 jest.mock("react-i18next", () => ({
@@ -16,6 +23,10 @@ jest.mock("react-i18next", () => ({
 
 let mockSettings: Record<string, unknown> = {};
 const mockUpdateSettings = jest.fn();
+const mockWriteDebugLog = jest.fn();
+jest.mock("@/utils/log", () => ({
+  writeDebugLog: (...args: unknown[]) => mockWriteDebugLog(...args),
+}));
 jest.mock("@/utils/atoms/settings", () => ({
   useSettings: () => ({
     settings: mockSettings,
@@ -27,72 +38,74 @@ jest.mock("@/utils/atoms/settings", () => ({
 // final.
 const board = parseScoreboard(JSON.parse(JSON.stringify(details)))!;
 const byAway = (abbr: string) => board.find((g) => g.away.abbr === abbr)!;
-const pin = (
-  game: GameScore,
-  gameOnScreen: GameScore | null = game,
-): PinnedGame => ({
-  tileKey: `tile-${game.id}`,
-  color: "#60a5fa",
-  gameId: game.id,
-  teams: { away: game.away.abbr, home: game.home.abbr },
-  game: gameOnScreen,
-});
 const view = (more: Partial<LiveScoresView> = {}): LiveScoresView => ({
   status: "ok",
-  pinned: [pin(byAway("SEA"))],
+  waiting: false,
+  followed: [byAway("SEA")],
   others: [byAway("PIT"), byAway("NE")],
   delaySeconds: 30,
   ...more,
 });
 
+/** A fresh store per test, holding the follows the panel reads and sets. */
+let store = createStore();
+const render = (ui: ReactElement) =>
+  rtlRender(<Provider store={store}>{ui}</Provider>);
+const follows = () => store.get(followedGameIdsAtom);
+
 describe("ScoresPanel", () => {
   beforeEach(() => {
+    store = createStore();
+    store.set(followedGameIdsAtom, [byAway("SEA").id]);
+    mockWriteDebugLog.mockClear();
     mockSettings = { liveScoresEnabled: true, liveScoresDelaySeconds: 30 };
     mockUpdateSettings.mockReset();
   });
 
   // R6
-  test("your game in full: score, clock, down, last play, odds, drive, timeouts, leaders", async () => {
+  test("a followed game in full: score, clock, down, last play, odds, drive, timeouts, leaders", async () => {
     await render(<ScoresPanel view={view()} />);
-    // 7-7: both scores show.
-    expect(screen.getAllByText("7")).toHaveLength(2);
-    expect(screen.getByText(/^livescores\.quarter_clock:/)).toBeTruthy();
+    // 7-7: both scores show in its details.
+    const details = within(screen.getByTestId(`details-${byAway("SEA").id}`));
+    expect(details.getAllByText("7")).toHaveLength(2);
+    expect(details.getByText(/^livescores\.quarter_clock:/)).toBeTruthy();
     expect(
-      screen.getByText(
+      details.getByText(
         "livescores.last_play:(Shotgun) M.Washington up the middle to SEA 46 for no gain (D.Fowler).",
       ),
     ).toBeTruthy();
     expect(
-      screen.getByText("livescores.win_probability:SEA,68,LV,32"),
+      details.getByText("livescores.win_probability:SEA,68,LV,32"),
     ).toBeTruthy();
     expect(
-      screen.getByText("livescores.drive:3 plays, 19 yards, 1:20"),
+      details.getByText("livescores.drive:3 plays, 19 yards, 1:20"),
     ).toBeTruthy();
-    expect(screen.getByText("livescores.timeouts:SEA,3,LV,3")).toBeTruthy();
+    expect(details.getByText("livescores.timeouts:SEA,3,LV,3")).toBeTruthy();
     expect(
-      screen.getByText(
+      details.getByText(
         "livescores.leader_passing:D. Lock (SEA),2/2, 43 YDS, 1 TD",
       ),
     ).toBeTruthy();
-    expect(screen.getByText(/^livescores\.leader_rushing:/)).toBeTruthy();
-    expect(screen.getByText(/^livescores\.leader_receiving:/)).toBeTruthy();
+    expect(details.getByText(/^livescores\.leader_rushing:/)).toBeTruthy();
+    expect(details.getByText(/^livescores\.leader_receiving:/)).toBeTruthy();
   });
 
   // R6: a detail ESPN didn't give is left out, the rest stays.
   test("a missing detail is just left out", async () => {
     const sea = byAway("SEA");
     const bare = { ...sea, details: { timeouts: sea.details.timeouts } };
-    await render(<ScoresPanel view={view({ pinned: [pin(bare)] })} />);
+    await render(<ScoresPanel view={view({ followed: [bare] })} />);
     expect(screen.getByText("livescores.timeouts:SEA,3,LV,3")).toBeTruthy();
     expect(screen.queryByText(/^livescores\.last_play:/)).toBeNull();
     expect(screen.queryByText(/^livescores\.win_probability:/)).toBeNull();
     expect(screen.queryByText(/^livescores\.leader_/)).toBeNull();
   });
 
-  // R4: before the delay has passed, the teams and a note, never a score.
-  test("before the delay, your game waits without a score", async () => {
-    const sea = byAway("SEA");
-    await render(<ScoresPanel view={view({ pinned: [pin(sea, null)] })} />);
+  // S5: before the delay has passed, a note and never a score.
+  test("before the delay, says scores are coming and shows none", async () => {
+    await render(
+      <ScoresPanel view={view({ waiting: true, followed: [], others: [] })} />,
+    );
     expect(screen.getByText("livescores.waiting:30")).toBeTruthy();
     expect(screen.queryAllByText("7")).toHaveLength(0);
     expect(screen.queryByText(/^livescores\.last_play:/)).toBeNull();
@@ -122,7 +135,7 @@ describe("ScoresPanel", () => {
     });
   });
 
-  test("says how far behind your games are, and turns scores off", async () => {
+  test("says how far behind the scores are, and turns scores off", async () => {
     await render(<ScoresPanel view={view()} />);
     expect(screen.getByText("livescores.delay_status:30")).toBeTruthy();
     await fireEvent.press(screen.getByText("livescores.turn_off"));
@@ -138,7 +151,7 @@ describe("ScoresPanel", () => {
         view={view({
           status: "unavailable",
           reason: "format",
-          pinned: [],
+          followed: [],
           others: [],
         })}
       />,
@@ -154,5 +167,45 @@ describe("ScoresPanel", () => {
       .getAllByRole("button")
       .map((b) => b.props.style.width ?? b.props.style.minWidth);
     expect(new Set(widths).size).toBe(1);
+  });
+
+  // S3
+  test("selecting another game shows it in full, and Follow adds it", async () => {
+    const pit = byAway("PIT");
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByTestId(`select-${pit.id}`));
+    expect(screen.getByTestId(`details-${pit.id}`)).toBeTruthy();
+
+    await fireEvent.press(screen.getByText("livescores.follow"));
+    expect(follows()).toEqual([byAway("SEA").id, pit.id]);
+    expect(mockWriteDebugLog).toHaveBeenCalledWith(
+      "Live scores: follows changed",
+      { game: pit.id, followed: [byAway("SEA").id, pit.id] },
+    );
+  });
+
+  test("a followed game offers Unfollow, which removes it", async () => {
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByText("livescores.unfollow"));
+    expect(follows()).toEqual([]);
+  });
+
+  // S8
+  test("with two followed, Follow is off and says why", async () => {
+    store.set(followedGameIdsAtom, [byAway("SEA").id, "another"]);
+    const ne = byAway("NE");
+    await render(<ScoresPanel view={view()} />);
+    await fireEvent.press(screen.getByTestId(`select-${ne.id}`));
+
+    const follow = screen.getByRole("button", { name: "livescores.follow" });
+    expect(follow.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(screen.getByText("livescores.follow_limit")).toBeTruthy();
+    await fireEvent.press(follow);
+    expect(follows()).toEqual([byAway("SEA").id, "another"]);
+  });
+
+  test("with nothing followed and nothing selected, no game is shown in full", async () => {
+    await render(<ScoresPanel view={view({ followed: [] })} />);
+    expect(screen.queryAllByTestId(/^details-/)).toHaveLength(0);
   });
 });

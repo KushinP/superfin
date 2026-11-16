@@ -37,11 +37,16 @@ import {
   TVSkipSegmentCard,
 } from "@/components/tv";
 import { TVFocusableProgressBar } from "@/components/tv/TVFocusableProgressBar";
+import {
+  PlayerScoresButton,
+  PlayerScoresRail,
+} from "@/components/video-player/controls/PlayerScores";
 import { NEXT_EPISODE_COUNTDOWN_MS } from "@/constants/Playback";
 import { useScaledTVTypography } from "@/constants/TVTypography";
 import useRouter from "@/hooks/useAppRouter";
 import { useMediaSegments } from "@/hooks/useMediaSegments";
 import { usePlaybackManager } from "@/hooks/usePlaybackManager";
+import { useScoresScreen } from "@/hooks/useScoresScreen";
 import type { SegmentType } from "@/hooks/useSegmentSkipper";
 import { useServerVersion } from "@/hooks/useServerVersion";
 import { useTrickplay } from "@/hooks/useTrickplay";
@@ -296,7 +301,13 @@ export const Controls: FC<Props> = ({
   const { subtitleTracks: videoContextSubtitleTracks } = useVideoContext();
 
   // Track which button should have preferred focus when controls show
-  type LastModalType = "audio" | "subtitle" | "quality" | "techInfo" | null;
+  type LastModalType =
+    | "audio"
+    | "subtitle"
+    | "quality"
+    | "techInfo"
+    | "scores"
+    | null;
   const [lastOpenedModal, setLastOpenedModal] = useState<LastModalType>(null);
 
   // Track if play button should have focus (when showing controls via up/down D-pad)
@@ -650,6 +661,13 @@ export const Controls: FC<Props> = ({
       setShowMinimalSeekBar(false);
     }, 2500);
   }, []);
+
+  const openScores = useScoresScreen();
+  const handleOpenScores = useCallback(() => {
+    setLastOpenedModal("scores");
+    openScores();
+    controlsInteractionRef.current();
+  }, [openScores]);
 
   const handleOpenAudioSheet = useCallback(() => {
     setLastOpenedModal("audio");
@@ -1521,6 +1539,8 @@ export const Controls: FC<Props> = ({
             )}
           </View>
 
+          <PlayerScoresRail isLiveTV={isLiveTV} width={progressBarWidth} />
+
           {/* Upward: control buttons → visible skip segment or next episode card */}
           {topOverlayFocusTarget && (
             <TVFocusGuideView
@@ -1591,6 +1611,15 @@ export const Controls: FC<Props> = ({
             )}
 
             <View style={styles.controlButtonsSpacer} />
+
+            <PlayerScoresButton
+              isLiveTV={isLiveTV}
+              onPress={handleOpenScores}
+              focusable={showControls}
+              hasTVPreferredFocus={
+                !isCountdownActive && lastOpenedModal === "scores"
+              }
+            />
 
             {onBitrateChange && !offline && !isLiveTV && (
               <TVControlButton

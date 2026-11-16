@@ -1,6 +1,7 @@
 import {
+  LIVE_SCORES_MAX_FOLLOWED,
   LIVE_SCORES_RAIL_CHIP_WIDTH,
-  LIVE_SCORES_RAIL_PINNED_WIDTH,
+  LIVE_SCORES_RAIL_FOLLOWED_WIDTH,
   LIVE_SCORES_RAIL_SEPARATOR_WIDTH,
 } from "@/constants/LiveScores";
 import type { GameScore } from "./espnScoreboard";
@@ -24,28 +25,59 @@ export const orderGames = (games: readonly GameScore[]): GameScore[] =>
   );
 
 /**
- * The games for the rail's unpinned part: every game except those on the
- * tiles, in rail order. Only matched games are left out, so a tile whose
- * listing named no game leaves its game (if any) in the list.
+ * The followed games, in the order followed, and every other game in rail
+ * order. A followed game missing from these games is left out.
  */
-export const otherGames = (
+export const splitFollowed = (
   games: readonly GameScore[],
-  onScreen: ReadonlySet<string>,
-): GameScore[] => orderGames(games.filter((g) => !onScreen.has(g.id)));
+  followedIds: readonly string[],
+): { followed: GameScore[]; others: GameScore[] } => ({
+  followed: followedIds.flatMap((id) => games.filter((g) => g.id === id)),
+  others: orderGames(games.filter((g) => !followedIds.includes(g.id))),
+});
 
-/** How many of the other games fit beside the pinned ones; at least one. */
+/**
+ * The follows still worth keeping: a game that's over, or gone from the
+ * feed (the next week's board), is unfollowed, so it stops leading the rail.
+ */
+export const activeFollows = (
+  followedIds: readonly string[],
+  games: readonly GameScore[],
+): string[] =>
+  followedIds.filter((id) => {
+    const game = games.find((g) => g.id === id);
+    return game !== undefined && game.state !== "post";
+  });
+
+/** Follows or unfollows a game; a game past the limit isn't added. */
+export const toggleFollow = (
+  followedIds: readonly string[],
+  gameId: string,
+): string[] => {
+  if (followedIds.includes(gameId)) {
+    return followedIds.filter((id) => id !== gameId);
+  }
+  if (followedIds.length >= LIVE_SCORES_MAX_FOLLOWED) return [...followedIds];
+  return [...followedIds, gameId];
+};
+
+/** Whether any game is being played: the rail only shows then. */
+export const hasLiveGame = (games: readonly GameScore[]): boolean =>
+  games.some((g) => g.state === "in");
+
+/** How many of the other games fit beside the followed ones; at least one. */
 export const chipsPerPage = (
   railWidth: number,
-  pinnedCount: number,
+  followedCount: number,
 ): number => {
-  const pinned =
-    pinnedCount > 0
-      ? pinnedCount * LIVE_SCORES_RAIL_PINNED_WIDTH +
+  const followed =
+    followedCount > 0
+      ? followedCount * LIVE_SCORES_RAIL_FOLLOWED_WIDTH +
         LIVE_SCORES_RAIL_SEPARATOR_WIDTH
       : 0;
   return Math.max(
     1,
-    Math.floor((railWidth - pinned) / LIVE_SCORES_RAIL_CHIP_WIDTH),
+    Math.floor((railWidth - followed) / LIVE_SCORES_RAIL_CHIP_WIDTH),
   );
 };
 

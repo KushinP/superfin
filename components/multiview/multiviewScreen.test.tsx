@@ -136,7 +136,13 @@ jest.mock("@/hooks/useLiveScores", () => ({
   useLiveScores: () => ({
     tiles: new Map(),
     games: [],
-    view: { status: "ok", pinned: [], others: [], delaySeconds: 30 },
+    view: {
+      status: "ok",
+      waiting: false,
+      followed: [],
+      others: [],
+      delaySeconds: 30,
+    },
   }),
 }));
 const mockUseMediaKeySession = jest.fn();

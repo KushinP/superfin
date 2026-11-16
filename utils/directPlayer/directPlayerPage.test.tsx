@@ -111,6 +111,9 @@ jest.mock("@/hooks/useAppRouter", () => ({
   default: () => mockRouter,
 }));
 jest.mock("@/hooks/useHaptic", () => ({ useHaptic: () => mockNoop }));
+jest.mock("@/hooks/useLiveScores", () => ({
+  useLiveScores: () => ({ view: null }),
+}));
 jest.mock("@/hooks/useNetworkStatus", () => ({
   useNetworkStatus: () => ({ isConnected: true }),
 }));

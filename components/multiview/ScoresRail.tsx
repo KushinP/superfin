@@ -7,8 +7,12 @@ import {
   LIVE_SCORES_RAIL_PAGE_MS,
 } from "@/constants/LiveScores";
 import type { LiveScoresView } from "@/utils/atoms/liveScores";
-import { chipsPerPage, railPage } from "@/utils/livescores/railItems";
-import { GameChip, PinnedChip } from "./RailChip";
+import {
+  chipsPerPage,
+  hasLiveGame,
+  railPage,
+} from "@/utils/livescores/railItems";
+import { FollowedChip, GameChip } from "./RailChip";
 
 const UNAVAILABLE_KEYS = {
   network: "livescores.unavailable_network",
@@ -23,14 +27,14 @@ interface Props {
 }
 
 /**
- * The scores strip: the games on the tiles first, then a page of every other
- * game, turning every 8 s when they don't all fit. For reading only: it
- * takes no touches and offers the remote nothing to focus, so it never
- * pulls focus away from the tiles.
+ * The scores strip: the followed games first, then a page of every other
+ * game, turning every 8 s when they don't all fit. Shown only while a game
+ * is being played. For reading only: it takes no touches and offers the
+ * remote nothing to focus, so it never pulls focus away from the video.
  */
 export function ScoresRail({ view, width }: Props) {
   const { t } = useTranslation();
-  const perPage = chipsPerPage(width, view.pinned.length);
+  const perPage = chipsPerPage(width, view.followed.length);
   const pages = Math.max(1, Math.ceil(view.others.length / perPage));
   const [page, setPage] = useState(0);
 
@@ -44,7 +48,7 @@ export function ScoresRail({ view, width }: Props) {
   }, [pages]);
 
   const unavailable = view.status === "unavailable";
-  if (!unavailable && view.pinned.length === 0 && view.others.length === 0) {
+  if (!unavailable && !hasLiveGame([...view.followed, ...view.others])) {
     return null;
   }
 
@@ -61,10 +65,10 @@ export function ScoresRail({ view, width }: Props) {
         </Text>
       ) : (
         <>
-          {view.pinned.map((pinned) => (
-            <PinnedChip key={pinned.tileKey} pinned={pinned} />
+          {view.followed.map((game) => (
+            <FollowedChip key={game.id} game={game} />
           ))}
-          {view.pinned.length > 0 && view.others.length > 0 && (
+          {view.followed.length > 0 && view.others.length > 0 && (
             <View style={styles.separator} />
           )}
           {railPage(view.others, perPage, page).map((game) => (

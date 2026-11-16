@@ -1,11 +1,7 @@
 import { render, screen } from "@testing-library/react-native";
-import type { PinnedGame } from "@/utils/atoms/liveScores";
 import recorded from "@/utils/livescores/__fixtures__/scoreboard-2026-11-15.json";
-import {
-  type GameScore,
-  parseScoreboard,
-} from "@/utils/livescores/espnScoreboard";
-import { GameChip, PinnedChip } from "./RailChip";
+import { parseScoreboard } from "@/utils/livescores/espnScoreboard";
+import { FollowedChip, GameChip } from "./RailChip";
 
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -16,20 +12,13 @@ jest.mock("react-i18next", () => ({
 
 const board = parseScoreboard(JSON.parse(JSON.stringify(recorded)))!;
 const byAway = (abbr: string) => board.find((g) => g.away.abbr === abbr)!;
-const pinned = (game: GameScore | null): PinnedGame => ({
-  tileKey: "tile-0",
-  color: "#60a5fa",
-  gameId: byAway("KC").id,
-  teams: { away: "KC", home: "ATL" },
-  game,
-});
 
-describe("PinnedChip", () => {
-  test("a game in play: tag colour, both scores, quarter and clock, the ball", async () => {
-    await render(<PinnedChip pinned={pinned(byAway("KC"))} />);
-    expect(screen.getByTestId("rail-tag").props.style).toMatchObject({
-      backgroundColor: "#60a5fa",
-    });
+describe("FollowedChip", () => {
+  test("a game in play: both scores, quarter and clock, the ball", async () => {
+    await render(<FollowedChip game={byAway("KC")} />);
+    expect(
+      screen.getByTestId(`rail-chip-followed-${byAway("KC").id}`),
+    ).toBeTruthy();
     expect(screen.getByText("KC")).toBeTruthy();
     expect(screen.getByText("14")).toBeTruthy();
     expect(screen.getByText("ATL")).toBeTruthy();
@@ -41,13 +30,11 @@ describe("PinnedChip", () => {
     expect(screen.queryByTestId("rail-ball-home")).toBeNull();
   });
 
-  // R4: before the delay has passed only the teams show, never a score.
-  test("before the delay: the teams and a dash, no score", async () => {
-    await render(<PinnedChip pinned={pinned(null)} />);
-    expect(screen.getByText("KC")).toBeTruthy();
-    expect(screen.getByText("ATL")).toBeTruthy();
-    expect(screen.getByText("–")).toBeTruthy();
-    expect(screen.queryByText(/\d/)).toBeNull();
+  test("a game still to come: the teams, no score", async () => {
+    await render(<FollowedChip game={byAway("SEA")} />);
+    expect(screen.getByText("SEA")).toBeTruthy();
+    expect(screen.getByText("LV")).toBeTruthy();
+    expect(screen.queryByText("0")).toBeNull();
   });
 });
 
