@@ -93,6 +93,7 @@ Native modules:
 - `android-mpv-one-player-per-process` | MpvOwnership.kt lets one MPV renderer play per Android process, so Android TV multiview tiles use ExoPlayer (multiviewEngine) and Android phones have none
 - `exoplayer-tiles-need-pcm-and-no-audio-focus` | several ExoPlayers at once: each takes audio focus and pauses the others, and passthrough ignores volume; tiles pass multiview: true (no focus, PCM-only sink)
 - `exoplayer-view-must-not-release-on-detach` | a view is detached and reattached while on screen (a re-order, the Fire TV long-press sheet); ExoPlayerView releases only via JS destroy() and OnViewDestroys, never onDetachedFromWindow
+- `fire-os-media-keys-go-to-a-media-session` | Fire OS sends ⏯ ⏪ ⏩ to the media-button session, never as key events; MediaKeySession takes key presses only (Alexa attaches to it), and ⏪ ⏩ need their own case
 - `native-player-presented-after-dismiss` | iOS keeps the player session until the cross-dissolve ends, so present() right after onDismiss is refused; a new player waits for the closing one, and a swap whose player closed is dropped unless its stream ended and another item was asked for
 
 TV platform:
@@ -102,12 +103,15 @@ TV platform:
 - `streamystats-components-location` | components/home/Streamystats*.tv.tsx, watchlists/[watchlistId].tsx
 - `platform-specific-file-suffix-does-not-work` | .tv.* only resolves under EXPO_TV=1; require the TV file explicitly behind Platform.isTV
 - `tvfocusguideview-ignores-display-style` | TVFocusGuideView sets its own display last, so `display: "none"` in its style is ignored; hide it with `enabled={false}`
+- `fire-tv-no-playback-check-route-and-memory` | nothing plays or it stutters: check the stream URL (tunnel vs LAN), an older build, and the TV's free memory before blaming the app
 - `android-tv-modal-close-loses-focus` | a dismissed TV modal route leaves Android TV with nothing focused; the page must hand the focus back with requestTVFocus(). BlurView only tints there
 
 Build and tooling:
 - `eas-archive-drops-gitignored-tracked-files` | EAS uploads skip anything matching .gitignore even if tracked; re-include required assets, keep asset require() at module scope
 - `bun-test-discovery-leaks-fds` | bare `bun test` leaves ~14k fds open; child processes spawned from tests get dead stdio, so do the work in-process
 - `metro-ci-mode-does-not-watch` | `CI=1 expo start` turns file watching off, so edits never reach the app; start Metro without it
+- `jest-fake-require-native-module-must-pass-through` | a fake requireNativeModule must answer only its own name; Expo's lazy fetch asks for ExpoFetchModule, and CI failed where the Mac passed
+- `develop-merge-cancels-tv-build` | build-apps cancels develop's running build on each merge; install a PR branch's artifact, or merge everything first and wait for one build
 - `require-hooks-leak-across-jest-specs` | a require hook (tsx/cjs) registered from a spec stays on the Jest worker's Node loader and breaks later specs; map it to a stub
 
 ## Project overview
