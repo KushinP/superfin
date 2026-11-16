@@ -1,6 +1,6 @@
 # Live scores, v3: every game on the rail, you pick yours (product spec)
 
-Status: Approved (Gate 1). Kush: "approve", 2026-11-15.
+Status: Approved (Gates 1 and 2). Kush: "approve" (Gate 1), "approved" (Gate 2), 2026-11-15.
 Date: 2026-11-15
 Branch: `kush/live-scores-pick`
 Builds on: `docs/specs/2026-11-15-live-scores-rail.md` (v2, shipped in #16) and `docs/specs/2026-11-15-live-scores-overlay.md` (v1, #12). This replaces their automatic guide matching.
