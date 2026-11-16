@@ -40,6 +40,15 @@ export const TVSettingsTextInput: React.FC<TVSettingsTextInputProps> = ({
     onBlur?.();
   };
 
+  // The Fire TV keyboard edits in a full-screen editor that can fail to
+  // attach ("startExtractingText: mExtractedText = null"): the typed text
+  // then lands in the field without onChangeText, and the screen never sees
+  // it (Fire TV, 2026-11-16: the Seerr address showed, Login stayed off).
+  // When editing ends, hand on whatever the field holds.
+  const syncFinalText = (text: string | undefined) => {
+    if (text !== undefined && text !== value) onChangeText(text);
+  };
+
   return (
     <Pressable
       onPress={() => inputRef.current?.focus()}
@@ -89,6 +98,8 @@ export const TVSettingsTextInput: React.FC<TVSettingsTextInputProps> = ({
           placeholder={placeholder}
           placeholderTextColor='#6B7280'
           onChangeText={onChangeText}
+          onEndEditing={(e) => syncFinalText(e.nativeEvent.text)}
+          onSubmitEditing={(e) => syncFinalText(e.nativeEvent.text)}
           onBlur={handleInputBlur}
           secureTextEntry={secureTextEntry}
           autoCapitalize='none'
