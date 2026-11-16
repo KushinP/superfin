@@ -6,6 +6,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 
 /**
@@ -23,6 +24,10 @@ import android.view.KeyEvent
  * themselves what a key means.
  */
 class MediaKeySession(private val context: Context, private val onKey: (String) -> Unit) {
+    companion object {
+        private const val TAG = "MediaKeySession"
+    }
+
     private var session: MediaSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -78,15 +83,17 @@ class MediaKeySession(private val context: Context, private val onKey: (String) 
                 else -> return super.onMediaButtonEvent(mediaButtonIntent)
             }
             // One press, one action: the release arrives as its own event.
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) onKey(key)
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                Log.i(TAG, "media key $key")
+                onKey(key)
+            }
             return true
         }
 
-        // Transport controls that come without a key event, such as a
-        // voice command.
-        override fun onPlay() = onKey("play")
-        override fun onPause() = onKey("pause")
-        override fun onRewind() = onKey("rewind")
-        override fun onFastForward() = onKey("fastForward")
+        // Transport commands from other apps' controllers (onPlay, onPause
+        // and the rest) are left to the base class, which ignores them.
+        // Alexa's media agent attached to this session the moment playback
+        // started on the Fire TV (2026-11-15), and nothing played after: a
+        // command from it must not reach the player as if a key were pressed.
     }
 }

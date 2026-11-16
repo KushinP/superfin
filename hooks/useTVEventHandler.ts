@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { MEDIA_KEY_DEDUPE_MS } from "@/constants/Playback";
 import { nativeTVEventHandler } from "@/hooks/nativeTVEventHandler";
 import { addMediaKeyListener } from "@/modules/exoplayer-player/src/mediaKeys";
+import { writeDebugLog } from "@/utils/log";
 
 const isPress = (evt: HWEvent) =>
   evt.eventKeyAction === undefined || evt.eventKeyAction === 0;
@@ -33,7 +34,12 @@ export const useTVEventHandler = (callback: (evt: HWEvent) => void) => {
     if (!Platform.isTV || Platform.OS !== "android") return;
     const subscription = addMediaKeyListener((key) => {
       const at = pressedAt.current.get(key);
-      if (at !== undefined && Date.now() - at < MEDIA_KEY_DEDUPE_MS) return;
+      const acted = at === undefined || Date.now() - at >= MEDIA_KEY_DEDUPE_MS;
+      // So a device log shows what reached the player, and when: on the
+      // Fire TV (2026-11-15) nothing played with the session open, and
+      // nothing said whether a key had arrived.
+      writeDebugLog("Media keys: from the media session", { key, acted });
+      if (!acted) return;
       callbackRef.current({ eventType: key, eventKeyAction: 0 } as HWEvent);
     });
     return () => subscription?.remove();
