@@ -4,7 +4,11 @@ const mockStart = jest.fn();
 const mockStop = jest.fn();
 let mockListener: ((event: { key: string }) => void) | undefined;
 const mockRemove = jest.fn();
+// The rest of the real module stays: jest.resetModules() below touches
+// Expo's lazy global fetch, which builds on its classes (a fake without them
+// failed in CI with "Super expression must either be null or a function").
 jest.mock("expo-modules-core", () => ({
+  ...jest.requireActual("expo-modules-core"),
   requireNativeModule: () => ({
     startMediaKeySession: mockStart,
     stopMediaKeySession: mockStop,
