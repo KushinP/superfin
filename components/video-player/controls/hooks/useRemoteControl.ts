@@ -179,6 +179,17 @@ export function useRemoteControl({
       return;
     }
 
+    // The remote's own ⏪ and ⏩ keys, with the controls up or hidden: the
+    // same 10 s steps as left and right with the controls hidden. On the
+    // Fire TV (2026-11-15) they did nothing in single view, as only the
+    // arrow keys were handled. One seek per press, not on the release.
+    if (evt.eventType === "rewind" || evt.eventType === "fastForward") {
+      if (evt.eventKeyAction !== undefined && evt.eventKeyAction !== 0) return;
+      if (evt.eventType === "rewind") onMinimalSeekLeft?.();
+      else onMinimalSeekRight?.();
+      return;
+    }
+
     // Handle long press D-pad for continuous seeking (works in both modes)
     // Must be checked BEFORE the showControls check to work when controls are hidden
     if (evt.eventType === "longLeft") {
