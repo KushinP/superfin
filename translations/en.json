@@ -1566,15 +1566,22 @@
     "unavailable_network": "Scores unavailable: ESPN can't be reached",
     "unavailable_format": "Scores unavailable: ESPN's data has changed",
     "unavailable_stale": "Scores unavailable: they're more than 2 minutes old",
-    "menu_delay": "Live scores: {{seconds}} s behind",
-    "menu_off": "Live scores: off",
     "delay_more": "Show scores 5 s later",
     "delay_less": "Show scores 5 s sooner",
     "turn_off": "Turn live scores off",
     "turn_on": "Turn live scores on",
-    "delay_message": "Scores show {{seconds}} seconds behind real time, so they don't give away a play before you see it. If a score arrives before the play, show scores later.",
     "settings_enabled": "Live scores on multiview tiles",
     "settings_delay": "Score delay",
-    "settings_delay_value": "{{seconds}} s"
+    "settings_delay_value": "{{seconds}} s",
+    "delay_status": "Your games show {{seconds}} s behind live",
+    "waiting": "The score shows {{seconds}} s behind live, in a moment.",
+    "last_play": "Last play: {{text}}",
+    "win_probability": "Chance to win: {{away}} {{awayPct}}%, {{home}} {{homePct}}%",
+    "drive": "This drive: {{drive}}",
+    "timeouts": "Timeouts left: {{away}} {{awayCount}}, {{home}} {{homeCount}}",
+    "leader_passing": "Passing: {{name}}, {{line}}",
+    "leader_rushing": "Rushing: {{name}}, {{line}}",
+    "leader_receiving": "Receiving: {{name}}, {{line}}",
+    "open_scores": "Scores"
   }
 }

@@ -1,5 +1,4 @@
-import { act, render, screen } from "@testing-library/react-native";
-import type { TileScore } from "@/hooks/useLiveScores";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import recorded from "@/utils/livescores/__fixtures__/scoreboard-2026-11-15.json";
 import { parseScoreboard } from "@/utils/livescores/espnScoreboard";
 
@@ -76,20 +75,40 @@ jest.mock("@/utils/atoms/settings", () => {
   };
 });
 
-// The poller is covered by useLiveScores.test.tsx; here it says the first
-// tile shows KC @ ATL.
+// The poller is covered by useLiveScores*.test.tsx; here it says the first
+// tile shows KC @ ATL, pinned in the rail.
 const mockKcAtl = parseScoreboard(JSON.parse(JSON.stringify(recorded)))![0];
+/** False: no tile shows football, so there is no view (R10). */
+let mockHasView = true;
 jest.mock("@/hooks/useLiveScores", () => ({
   useLiveScores: (tiles: { key: string }[]) => ({
-    tiles: new Map<string, TileScore>(
-      tiles.length > 0
-        ? [[tiles[0].key, { kind: "game", game: mockKcAtl, via: "title" }]]
-        : [],
-    ),
+    tiles: new Map(),
     games: [],
+    view:
+      mockHasView && tiles.length > 0
+        ? {
+            status: "ok",
+            pinned: [
+              {
+                tileKey: tiles[0].key,
+                color: "#60a5fa",
+                gameId: mockKcAtl.id,
+                teams: { away: "KC", home: "ATL" },
+                game: mockKcAtl,
+              },
+            ],
+            others: [],
+            delaySeconds: 30,
+          }
+        : null,
   }),
 }));
 
+// Opening the scores screen is covered by useScoresScreen.test.tsx.
+const mockOpenScores = jest.fn();
+jest.mock("@/hooks/useScoresScreen", () => ({
+  useScoresScreen: () => mockOpenScores,
+}));
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ itemIds: "a,b" }),
   useFocusEffect: () => {},
@@ -133,9 +152,8 @@ jest.mock("@/utils/multiview/availability", () => ({
 // After the mocks, which it imports.
 const MultiviewRoute = jest.requireActual("@/app/(auth)/multiview").default;
 
-/** The tile menu's Live scores item, and the sheet's "5 s later". */
-const LIVE_SCORES = 4;
-const LATER = 0;
+/** The tile menu's Scores item. */
+const SCORES = 4;
 
 beforeEach(() => {
   for (const key of Object.keys(mockTileProps)) delete mockTileProps[key];
@@ -144,51 +162,64 @@ beforeEach(() => {
   mockSheetChoices.length = 0;
   mockSheets.length = 0;
   mockSettings = { liveScoresEnabled: true, liveScoresDelaySeconds: 30 };
+  mockHasView = true;
+  mockOpenScores.mockClear();
 });
 
 describe("live scores on the multiview screen", () => {
-  // A1
-  test("draws the score over the tiles and keeps it when the toolbar hides", async () => {
+  // R1 (v1's A1, now for the rail)
+  test("draws the scores rail and keeps it when the toolbar hides", async () => {
     jest.useFakeTimers();
     try {
       await render(<MultiviewRoute />);
-      expect(screen.getByTestId("score-bug")).toBeTruthy();
+      expect(screen.getByTestId("scores-rail")).toBeTruthy();
       expect(screen.getByText("KC")).toBeTruthy();
+      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
       expect(screen.getByLabelText("multiview.change_layout")).toBeTruthy();
 
       await act(async () => {
         await jest.advanceTimersByTimeAsync(10_000);
       });
-      // The toolbar has gone; the bug has not.
+      // The toolbar has gone; the rail and the tag have not.
       expect(screen.queryByLabelText("multiview.change_layout")).toBeNull();
-      expect(screen.getByTestId("score-bug")).toBeTruthy();
+      expect(screen.getByTestId("scores-rail")).toBeTruthy();
+      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
     } finally {
       jest.useRealTimers();
     }
   });
 
-  // A6
-  test("+5 s from the tile menu makes the delay 35 s and rebuilds no tile", async () => {
+  // R5
+  test("Scores in the toolbar opens the scores screen and rebuilds no tile", async () => {
     await render(<MultiviewRoute />);
-    expect(mockSheets).toHaveLength(0);
-
-    mockSheetChoices.push(LIVE_SCORES, LATER);
-    await act(() => mockTileProps.a.onLongPress());
-
-    expect(mockSheets[0].options[LIVE_SCORES]).toBe("livescores.menu_delay:30");
-    expect(mockSettings.liveScoresDelaySeconds).toBe(35);
-
-    // The menu shows the new delay next time.
-    await act(() => mockTileProps.a.onLongPress());
-    expect(mockSheets.at(-1)?.options[LIVE_SCORES]).toBe(
-      "livescores.menu_delay:35",
-    );
-
+    await fireEvent.press(screen.getByLabelText("livescores.open_scores"));
+    expect(mockOpenScores).toHaveBeenCalledTimes(1);
     expect([...mockMounts].sort()).toEqual(["a", "b"]);
     expect(mockUnmounts).toEqual([]);
   });
 
-  test("Remove is still the tile menu's destructive option, below Live scores", async () => {
+  // R5
+  test("the tile menu's Scores item opens it too", async () => {
+    await render(<MultiviewRoute />);
+    mockSheetChoices.push(SCORES);
+    await act(() => mockTileProps.a.onLongPress());
+    expect(mockSheets[0].options[SCORES]).toBe("livescores.open_scores");
+    expect(mockOpenScores).toHaveBeenCalledTimes(1);
+    expect(mockUnmounts).toEqual([]);
+  });
+
+  // R10
+  test("with no football on any tile: no rail, no Scores button or item", async () => {
+    mockHasView = false;
+    await render(<MultiviewRoute />);
+    expect(screen.queryByTestId("scores-rail")).toBeNull();
+    expect(screen.queryByLabelText("livescores.open_scores")).toBeNull();
+    await act(() => mockTileProps.a.onLongPress());
+    expect(mockSheets[0].options).not.toContain("livescores.open_scores");
+    expect(mockSheets[0].options).toContain("multiview.remove_tile");
+  });
+
+  test("Remove is still the tile menu's destructive option, below Scores", async () => {
     await render(<MultiviewRoute />);
     await act(() => mockTileProps.a.onLongPress());
     const sheet = mockSheets[0] as {
