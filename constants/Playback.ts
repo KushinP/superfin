@@ -67,3 +67,12 @@ export const NATIVE_PLAYER_CLOSE_POLL_MS = 50;
  * the same channel through. The cost is that much delay behind the broadcast.
  */
 export const LIVE_PAUSE_WAIT_SECONDS = 5;
+
+/**
+ * How long, in ms, after a remote key arrives as a key press the same key
+ * from the media session is taken as that same press. Some Android TV boxes
+ * hand an unhandled media key on to the session as well, and a ⏯ acted on
+ * twice pauses and resumes in one press. Fire OS sends only the session's
+ * (2026-11-15); a real second press comes well over this apart.
+ */
+export const MEDIA_KEY_DEDUPE_MS = 300;
