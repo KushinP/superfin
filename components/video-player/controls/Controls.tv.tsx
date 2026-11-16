@@ -2,8 +2,7 @@ import type {
   BaseItemDto,
   MediaSourceInfo,
 } from "@jellyfin/sdk/lib/generated-client";
-import { useIsFocused } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAtomValue } from "jotai";
 import {
   type FC,
@@ -665,7 +664,15 @@ export const Controls: FC<Props> = ({
 
   const openScores = useScoresScreen();
   // False while Scores or a track picker, each a screen of its own, is on top.
-  const isScreenFocused = useIsFocused();
+  // Expo Router's useFocusEffect, not react-navigation's useIsFocused: as of
+  // SDK 56 importing @react-navigation/native fails the release bundle.
+  const [isScreenFocused, setScreenFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => setScreenFocused(false);
+    }, []),
+  );
   const handleOpenScores = useCallback(() => {
     setLastOpenedModal("scores");
     openScores();
