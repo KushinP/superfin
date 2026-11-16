@@ -1,20 +1,17 @@
-import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useQuery } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useAtom, useSetAtom } from "jotai";
+import { useEffect, useMemo, useState } from "react";
 import {
   LIVE_SCORES_DELAY_DEFAULT_S,
   LIVE_SCORES_POLL_IDLE_MS,
   LIVE_SCORES_POLL_LIVE_MS,
   LIVE_SCORES_SCOREBOARD_URL,
   LIVE_SCORES_STALE_MS,
-  LIVE_SCORES_TAG_COLORS,
 } from "@/constants/LiveScores";
-import { useChannelsNow } from "@/hooks/useChannelsNow";
 import {
+  followedGameIdsAtom,
   type LiveScoresView,
   liveScoresViewAtom,
-  type PinnedGame,
 } from "@/utils/atoms/liveScores";
 import { useSettings } from "@/utils/atoms/settings";
 import { markExpectedError } from "@/utils/errors";
@@ -29,23 +26,11 @@ import {
   parseScoreboard,
 } from "@/utils/livescores/espnScoreboard";
 import {
-  looksLikeFootball,
-  type MatchResult,
-  matchGame,
-} from "@/utils/livescores/matchGame";
-import { otherGames } from "@/utils/livescores/railItems";
+  activeFollows,
+  hasLiveGame,
+  splitFollowed,
+} from "@/utils/livescores/railItems";
 import { writeDebugLog } from "@/utils/log";
-
-/** A multiview tile, as far as scores care: its key and what it plays. */
-export interface LiveScoreTile {
-  key: string;
-  /** For a live TV tile, the channel's id. */
-  itemId: string;
-}
-
-export type TileScore =
-  | { kind: "game"; game: GameScore; via: MatchResult["via"] }
-  | { kind: "unavailable"; reason: "network" | "format" | "stale" };
 
 /** ESPN answered with something parseScoreboard does not recognise. */
 class ScoreboardFormatError extends Error {
@@ -53,8 +38,8 @@ class ScoreboardFormatError extends Error {
 }
 
 // Every failure is marked expected: ESPN's feed is unofficial, so it being
-// down or changed is a known outcome the bug handles by hiding, not an app
-// bug for Sentry, and on a 15 s poll it would be a flood.
+// down or changed is a known outcome the rail handles by saying so, not an
+// app bug for Sentry, and on a 15 s poll it would be a flood.
 const fetchScoreboard = async (signal: AbortSignal): Promise<GameScore[]> => {
   let response: Response;
   try {
@@ -81,68 +66,42 @@ const fetchScoreboard = async (signal: AbortSignal): Promise<GameScore[]> => {
   return games;
 };
 
-const NO_CHANNELS: string[] = [];
+type Reason = NonNullable<LiveScoresView["reason"]>;
 
 /**
- * Live NFL scores for the multiview's tiles: one shared ESPN poll however
- * many tiles show games, held back by the spoiler delay. A tile gets a game
- * once its guide listing matches one and the first fetch is a delay old,
- * "unavailable" when scores cannot be trusted, and nothing otherwise.
- * Nothing is fetched while the setting is off or no tile shows football.
+ * Live NFL scores for every game on ESPN's board, for the screen that's
+ * open (multiview, or the player on a live channel): one shared poll, held
+ * back by the spoiler delay, with the viewer's followed games first.
+ *
+ * It no longer works out which game a channel shows from the guide: on the
+ * Fire TV (2026-11-15) 49ers–Cowboys ran past its slot into "The OT", which
+ * names no teams, and its score vanished. Every game is shown, and the
+ * viewer picks theirs on the scores screen.
+ *
+ * Nothing is fetched while `active` is false or scores are turned off.
  */
-export const useLiveScores = (tiles: LiveScoreTile[]) => {
+export const useLiveScores = (active: boolean) => {
   const { settings } = useSettings();
-  const enabled = settings.liveScoresEnabled !== false;
+  const enabled = active && settings.liveScoresEnabled !== false;
   const delayMs =
     clampDelaySeconds(
       settings.liveScoresDelaySeconds ?? LIVE_SCORES_DELAY_DEFAULT_S,
     ) * 1000;
 
-  // The screen hands a new array every render; key on what is in it.
-  const tilesKey = tiles.map((t) => `${t.key}=${t.itemId}`).join("|");
-  const stableTiles = useMemo(() => tiles, [tilesKey]);
-  const channelIds = useMemo(
-    () =>
-      enabled ? [...new Set(stableTiles.map((t) => t.itemId))] : NO_CHANNELS,
-    [enabled, stableTiles],
-  );
-  const programs = useChannelsNow(channelIds);
-
-  const footballTiles = useMemo(
-    () =>
-      enabled
-        ? stableTiles.filter((t) => looksLikeFootball(programs.get(t.itemId)))
-        : [],
-    [enabled, stableTiles, programs],
-  );
-
-  // Read by refetchInterval, which runs outside render.
-  const programsRef = useRef(programs);
-  programsRef.current = programs;
-  const footballRef = useRef(footballTiles);
-  footballRef.current = footballTiles;
-
   const query = useQuery({
     queryKey: ["livescores", "nfl", "scoreboard"],
     queryFn: ({ signal }) => fetchScoreboard(signal),
-    enabled: footballTiles.length > 0,
+    enabled,
     // Never written to the disk cache: old scores on the next launch would
     // only mislead.
     gcTime: 0,
     retry: 1,
-    // Fast while a game on screen is in play, judged on the newest fetch,
-    // not the delayed one, or the first half minute of a game would poll
-    // slowly.
-    refetchInterval: (q) => {
-      const games = q.state.data;
-      const live = footballRef.current.some((tile) => {
-        const match = games
-          ? matchGame({ program: programsRef.current.get(tile.itemId), games })
-          : null;
-        return games?.find((g) => g.id === match?.gameId)?.state === "in";
-      });
-      return live ? LIVE_SCORES_POLL_LIVE_MS : LIVE_SCORES_POLL_IDLE_MS;
-    },
+    // Fast while any game is in play, judged on the newest fetch, not the
+    // delayed one, or the first half minute of a game would poll slowly.
+    refetchInterval: (q) =>
+      q.state.data && hasLiveGame(q.state.data)
+        ? LIVE_SCORES_POLL_LIVE_MS
+        : LIVE_SCORES_POLL_IDLE_MS,
   });
 
   const [buffer, setBuffer] = useState<Snapshot<GameScore[]>[]>([]);
@@ -154,6 +113,15 @@ export const useLiveScores = (tiles: LiveScoreTile[]) => {
     setBuffer((b) => addSnapshot(b, fetched, Date.now(), delayMs));
     setNow(Date.now());
   }, [query.data, query.dataUpdatedAt, delayMs]);
+
+  // So a device test can tell "ESPN had no games" from "nothing was asked".
+  useEffect(() => {
+    if (!query.data || !query.dataUpdatedAt) return;
+    writeDebugLog("Live scores: fetched the scoreboard", {
+      games: query.data.length,
+      inProgress: query.data.filter((g) => g.state === "in").length,
+    });
+  }, [query.data, query.dataUpdatedAt]);
 
   // Wake exactly when the next fetched snapshot becomes old enough to show,
   // or when the newest one turns stale, rather than ticking every second.
@@ -177,9 +145,8 @@ export const useLiveScores = (tiles: LiveScoreTile[]) => {
   }, [buffer, now, delayMs]);
 
   const latest = buffer[buffer.length - 1];
-  // Any doubt about the data hides every bug (A8): a failed or unreadable
+  // Any doubt about the data hides every score: a failed or unreadable
   // fetch, or a newest fetch too old to trust.
-  type Reason = Extract<TileScore, { kind: "unavailable" }>["reason"];
   const unavailableReason: Reason | null = query.isError
     ? query.error instanceof ScoreboardFormatError
       ? "format"
@@ -189,115 +156,43 @@ export const useLiveScores = (tiles: LiveScoreTile[]) => {
       : null;
   const shown = delayedSnapshot(buffer, now, delayMs);
 
-  // Each tile's game, kept from one render to the next so a game that
-  // overruns its guide slot stays on its tile (see matchGame).
-  const stickyRef = useRef(new Map<string, string>());
-  const matches = useMemo(() => {
-    const found = new Map<string, MatchResult>();
-    if (!shown) return found;
-    for (const tile of footballTiles) {
-      const match = matchGame({
-        program: programs.get(tile.itemId),
-        games: shown.data,
-        previous: stickyRef.current.get(tile.key),
-      });
-      if (match) found.set(tile.key, match);
-    }
-    return found;
-  }, [shown, footballTiles, programs]);
-
+  const [followedIds, setFollowedIds] = useAtom(followedGameIdsAtom);
+  // A followed game that's over, or gone from the board, stops leading.
   useEffect(() => {
-    for (const [key, match] of matches) {
-      if (stickyRef.current.get(key) !== match.gameId) {
-        const program: BaseItemDto | undefined = programs.get(
-          footballTiles.find((t) => t.key === key)?.itemId ?? "",
-        );
-        // So a wrong game on a tile can be traced to the listing that led
-        // to it.
-        writeDebugLog("Live scores: matched a tile to a game", {
-          tile: key,
-          game: match.gameId,
-          via: match.via,
-          title: [program?.Name, program?.EpisodeTitle].filter(Boolean),
-        });
-      }
-    }
-    stickyRef.current = new Map(
-      [...matches].map(([key, match]) => [key, match.gameId]),
-    );
-  }, [matches, programs, footballTiles]);
+    if (!shown) return;
+    const kept = activeFollows(followedIds, shown.data);
+    if (kept.length !== followedIds.length) setFollowedIds(kept);
+  }, [shown, followedIds, setFollowedIds]);
 
-  const byTile = useMemo(() => {
-    const result = new Map<string, TileScore>();
-    for (const tile of footballTiles) {
-      if (unavailableReason) {
-        result.set(tile.key, {
-          kind: "unavailable",
-          reason: unavailableReason,
-        });
-        continue;
-      }
-      const match = matches.get(tile.key);
-      const game = shown?.data.find((g) => g.id === match?.gameId);
-      if (match && game) {
-        result.set(tile.key, { kind: "game", game, via: match.via });
-      }
-    }
-    return result;
-  }, [footballTiles, unavailableReason, matches, shown]);
-
-  // The rail's view. A tile's game is pinned as soon as the newest fetch
-  // matches it, but its score only once a fetch is a delay old; and it is
-  // left out of the live list from that first moment, or the rail would
-  // show its score live while the pinned slot waits.
   const delaySeconds = delayMs / 1000;
   const view = useMemo((): LiveScoresView | null => {
-    if (footballTiles.length === 0) return null;
+    if (!enabled) return null;
     if (unavailableReason) {
       return {
         status: "unavailable",
         reason: unavailableReason,
-        pinned: [],
+        waiting: false,
+        followed: [],
         others: [],
         delaySeconds,
       };
     }
-    const newest = latest?.data ?? [];
-    const pinned: PinnedGame[] = [];
-    for (const tile of footballTiles) {
-      const gameId =
-        matches.get(tile.key)?.gameId ??
-        matchGame({ program: programs.get(tile.itemId), games: newest })
-          ?.gameId;
-      if (!gameId || pinned.some((p) => p.gameId === gameId)) continue;
-      const known =
-        newest.find((g) => g.id === gameId) ??
-        shown?.data.find((g) => g.id === gameId);
-      if (!known) continue;
-      pinned.push({
-        tileKey: tile.key,
-        color:
-          LIVE_SCORES_TAG_COLORS[pinned.length % LIVE_SCORES_TAG_COLORS.length],
-        gameId,
-        teams: { away: known.away.abbr, home: known.home.abbr },
-        game: shown?.data.find((g) => g.id === gameId) ?? null,
-      });
+    if (!shown) {
+      return {
+        status: "ok",
+        waiting: true,
+        followed: [],
+        others: [],
+        delaySeconds,
+      };
     }
     return {
       status: "ok",
-      pinned,
-      others: otherGames(newest, new Set(pinned.map((p) => p.gameId))),
+      waiting: false,
+      ...splitFollowed(shown.data, followedIds),
       delaySeconds,
     };
-  }, [
-    footballTiles,
-    unavailableReason,
-    latest,
-    matches,
-    programs,
-    shown,
-    delaySeconds,
-  ]);
+  }, [enabled, unavailableReason, shown, followedIds, delaySeconds]);
 
   const setView = useSetAtom(liveScoresViewAtom);
   useEffect(() => {
@@ -306,5 +201,5 @@ export const useLiveScores = (tiles: LiveScoreTile[]) => {
   // Gone with the screen: a scores screen opened later must not show these.
   useEffect(() => () => setView(null), [setView]);
 
-  return { tiles: byTile, games: shown?.data ?? [], view };
+  return { view };
 };

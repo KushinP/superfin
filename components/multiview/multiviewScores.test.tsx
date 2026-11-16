@@ -75,32 +75,22 @@ jest.mock("@/utils/atoms/settings", () => {
   };
 });
 
-// The poller is covered by useLiveScores*.test.tsx; here it says the first
-// tile shows KC @ ATL, pinned in the rail.
+// The poller is covered by useLiveScores.test.tsx; here it says KC @ ATL
+// is being played.
 const mockKcAtl = parseScoreboard(JSON.parse(JSON.stringify(recorded)))![0];
-/** False: no tile shows football, so there is no view (R10). */
+/** False: scores are off, so there is no view (S9). */
 let mockHasView = true;
 jest.mock("@/hooks/useLiveScores", () => ({
-  useLiveScores: (tiles: { key: string }[]) => ({
-    tiles: new Map(),
-    games: [],
-    view:
-      mockHasView && tiles.length > 0
-        ? {
-            status: "ok",
-            pinned: [
-              {
-                tileKey: tiles[0].key,
-                color: "#60a5fa",
-                gameId: mockKcAtl.id,
-                teams: { away: "KC", home: "ATL" },
-                game: mockKcAtl,
-              },
-            ],
-            others: [],
-            delaySeconds: 30,
-          }
-        : null,
+  useLiveScores: () => ({
+    view: mockHasView
+      ? {
+          status: "ok",
+          waiting: false,
+          followed: [],
+          others: [mockKcAtl],
+          delaySeconds: 30,
+        }
+      : null,
   }),
 }));
 
@@ -174,16 +164,14 @@ describe("live scores on the multiview screen", () => {
       await render(<MultiviewRoute />);
       expect(screen.getByTestId("scores-rail")).toBeTruthy();
       expect(screen.getByText("KC")).toBeTruthy();
-      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
       expect(screen.getByLabelText("multiview.change_layout")).toBeTruthy();
 
       await act(async () => {
         await jest.advanceTimersByTimeAsync(10_000);
       });
-      // The toolbar has gone; the rail and the tag have not.
+      // The toolbar has gone; the rail has not.
       expect(screen.queryByLabelText("multiview.change_layout")).toBeNull();
       expect(screen.getByTestId("scores-rail")).toBeTruthy();
-      expect(screen.getByTestId("tile-tag-tile-0")).toBeTruthy();
     } finally {
       jest.useRealTimers();
     }
@@ -208,8 +196,8 @@ describe("live scores on the multiview screen", () => {
     expect(mockUnmounts).toEqual([]);
   });
 
-  // R10
-  test("with no football on any tile: no rail, no Scores button or item", async () => {
+  // S9
+  test("with scores off: no rail, no Scores button or item", async () => {
     mockHasView = false;
     await render(<MultiviewRoute />);
     expect(screen.queryByTestId("scores-rail")).toBeNull();

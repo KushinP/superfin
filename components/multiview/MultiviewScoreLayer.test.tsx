@@ -17,21 +17,10 @@ jest.mock("react-i18next", () => ({
 const board = parseScoreboard(JSON.parse(JSON.stringify(recorded)))!;
 const area = { width: 960, height: 540 };
 const frames = tileFrames("grid", 2, area.width, area.height);
-const tiles = [
-  { key: "tile-0", frame: frames[0] },
-  { key: "tile-1", frame: frames[1] },
-];
 const view: LiveScoresView = {
   status: "ok",
-  pinned: [
-    {
-      tileKey: "tile-1",
-      color: "#60a5fa",
-      gameId: board[0].id,
-      teams: { away: "KC", home: "ATL" },
-      game: board[0],
-    },
-  ],
+  waiting: false,
+  followed: [board[0]],
   others: board.slice(1),
   delaySeconds: 30,
 };
@@ -41,7 +30,9 @@ const flat = (testID: string) =>
 describe("MultiviewScoreLayer", () => {
   // R1: the rail sits where placeRail puts it, in the band below the tiles.
   test("puts the rail in the black band below the tiles", async () => {
-    await render(<MultiviewScoreLayer tiles={tiles} area={area} view={view} />);
+    await render(
+      <MultiviewScoreLayer frames={frames} area={area} view={view} />,
+    );
     const placed = placeRail(frames, area)!;
     expect(placed.overlay).toBe(false);
     expect(flat("rail-slot")).toMatchObject({
@@ -51,31 +42,34 @@ describe("MultiviewScoreLayer", () => {
     });
   });
 
-  test("tags a pinned game's tile with its colour along the top edge", async () => {
-    await render(<MultiviewScoreLayer tiles={tiles} area={area} view={view} />);
-    expect(flat("tile-tag-tile-1")).toMatchObject({
-      left: frames[1].left,
-      top: frames[1].top,
-      width: frames[1].width,
-      backgroundColor: "#60a5fa",
-    });
-    expect(screen.queryByTestId("tile-tag-tile-0")).toBeNull();
+  // v3: no tile is tied to a game, so no tile gets a colour tag.
+  test("tags no tile", async () => {
+    await render(
+      <MultiviewScoreLayer frames={frames} area={area} view={view} />,
+    );
+    expect(screen.queryAllByTestId(/^tile-tag-/)).toHaveLength(0);
   });
 
   test("takes no touches or remote presses from the tiles", async () => {
-    await render(<MultiviewScoreLayer tiles={tiles} area={area} view={view} />);
+    await render(
+      <MultiviewScoreLayer frames={frames} area={area} view={view} />,
+    );
     expect(screen.getByTestId("score-layer").props.pointerEvents).toBe("none");
   });
 
   // The v1 corner bug is gone: nothing is drawn over a picture's corner.
   test("draws no score over the tiles themselves", async () => {
-    await render(<MultiviewScoreLayer tiles={tiles} area={area} view={view} />);
+    await render(
+      <MultiviewScoreLayer frames={frames} area={area} view={view} />,
+    );
     expect(screen.queryByTestId("score-bug")).toBeNull();
   });
 
-  // R10
+  // S9
   test("nothing at all with no view", async () => {
-    await render(<MultiviewScoreLayer tiles={tiles} area={area} view={null} />);
+    await render(
+      <MultiviewScoreLayer frames={frames} area={area} view={null} />,
+    );
     expect(screen.queryByTestId("score-layer")).toBeNull();
   });
 });

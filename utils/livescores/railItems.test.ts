@@ -1,6 +1,14 @@
 import recorded from "./__fixtures__/scoreboard-2026-11-15.json";
 import { type GameScore, parseScoreboard } from "./espnScoreboard";
-import { chipsPerPage, orderGames, otherGames, railPage } from "./railItems";
+import {
+  activeFollows,
+  chipsPerPage,
+  hasLiveGame,
+  orderGames,
+  railPage,
+  splitFollowed,
+  toggleFollow,
+} from "./railItems";
 
 // KC @ ATL in play, MIN @ GB at halftime, NE vs DET final, SEA @ LV at 4:05.
 const board = parseScoreboard(JSON.parse(JSON.stringify(recorded)))!;
@@ -45,25 +53,56 @@ describe("orderGames", () => {
   });
 });
 
-describe("otherGames", () => {
-  test("leaves out the games on screen, keeps the rest in rail order", () => {
-    const kcAtl = board[0].id;
-    expect(away(otherGames(board, new Set([kcAtl])))).toEqual([
-      "MIN",
-      "SEA",
-      "NE",
-    ]);
+describe("splitFollowed", () => {
+  const kcAtl = board[0].id;
+  const seaLv = board[3].id;
+
+  test("followed games in the order followed, the rest in rail order", () => {
+    const { followed, others } = splitFollowed(board, [seaLv, kcAtl]);
+    expect(away(followed)).toEqual(["SEA", "KC"]);
+    expect(away(others)).toEqual(["MIN", "NE"]);
   });
 
-  // R9: a tile that matched nothing excludes nothing, so its game (if any)
-  // is listed among the others.
-  test("with nothing on screen matched, every game is listed", () => {
-    expect(otherGames(board, new Set())).toHaveLength(board.length);
+  test("with nothing followed, every game is among the others", () => {
+    expect(splitFollowed(board, []).others).toHaveLength(board.length);
+  });
+
+  test("a followed game missing from the board is left out", () => {
+    expect(splitFollowed(board, ["gone"]).followed).toEqual([]);
+  });
+});
+
+describe("activeFollows", () => {
+  // S4
+  test("drops a game that's over, or gone from the board", () => {
+    const ne = board.find((g) => g.away.abbr === "NE")!.id;
+    expect(activeFollows([board[0].id, ne, "gone"], board)).toEqual([
+      board[0].id,
+    ]);
+  });
+});
+
+describe("toggleFollow", () => {
+  test("follows, then unfollows", () => {
+    expect(toggleFollow([], "a")).toEqual(["a"]);
+    expect(toggleFollow(["a"], "a")).toEqual([]);
+  });
+
+  // S8
+  test("adds nothing past two", () => {
+    expect(toggleFollow(["a", "b"], "c")).toEqual(["a", "b"]);
+  });
+});
+
+describe("hasLiveGame", () => {
+  test("only a game being played counts", () => {
+    expect(hasLiveGame(board)).toBe(true);
+    expect(hasLiveGame(board.filter((g) => g.state !== "in"))).toBe(false);
   });
 });
 
 describe("chipsPerPage", () => {
-  test("fits fewer games beside more pinned ones", () => {
+  test("fits fewer games beside more followed ones", () => {
     expect(chipsPerPage(944, 0)).toBeGreaterThan(chipsPerPage(944, 2));
   });
 

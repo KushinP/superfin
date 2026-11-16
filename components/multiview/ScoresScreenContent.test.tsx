@@ -23,7 +23,8 @@ jest.mock("@/utils/atoms/settings", () => ({
 const view: LiveScoresView = {
   status: "unavailable",
   reason: "network",
-  pinned: [],
+  waiting: false,
+  followed: [],
   others: [],
   delaySeconds: 30,
 };

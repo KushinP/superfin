@@ -103,3 +103,7 @@ Gate 2 covers deleting the matching files listed above and their tests. There's 
 
 - S8 was "ask or disable"; it's now "disable" (D).
 - "Single view" is Android TV only; the phone player is out (E).
+
+## Changes
+
+- 2026-11-15, slice 1: `utils/livescores/nflTeams.ts` is deleted too. Only `matchGame` used it. `useChannelsNow` and its test are deleted, as section 1F allowed, since nothing else used it. `hooks/useLiveScoresView.test.tsx` is folded into `useLiveScores.test.tsx`.

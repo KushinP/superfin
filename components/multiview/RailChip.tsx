@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Text } from "@/components/common/Text";
-import type { PinnedGame } from "@/utils/atoms/liveScores";
 import type { GameScore } from "@/utils/livescores/espnScoreboard";
 import { gameStatusText } from "./gameStatusText";
 
@@ -10,37 +9,31 @@ const Ball = ({ side }: { side: "home" | "away" }) => (
 );
 
 /**
- * A game on one of the tiles, first in the rail: its tag colour, both teams
- * and scores, the clock and the ball. Before the spoiler delay has passed it
- * has the teams only, and a dash where the scores go.
+ * A followed game, first in the rail: both teams and scores, the clock and
+ * the ball.
  */
-export function PinnedChip({ pinned }: { pinned: PinnedGame }) {
+export function FollowedChip({ game }: { game: GameScore }) {
   const { t } = useTranslation();
-  const { game } = pinned;
-  const status = game ? gameStatusText(t, game) : null;
-  const scores = game && game.state !== "pre";
-  const ball = game?.down?.possessionAbbr;
+  const status = gameStatusText(t, game);
+  const scores = game.state !== "pre";
+  const ball = game.down?.possessionAbbr;
   return (
     <View
-      testID={`rail-chip-pinned-${pinned.tileKey}`}
-      style={[styles.chip, styles.pinned]}
+      testID={`rail-chip-followed-${game.id}`}
+      style={[styles.chip, styles.followed]}
     >
-      <View
-        testID='rail-tag'
-        style={{ ...styles.tag, backgroundColor: pinned.color }}
-      />
-      {game && ball === game.away.abbr && <Ball side='away' />}
+      {ball === game.away.abbr && <Ball side='away' />}
       <Text className='text-xs text-neutral-300 font-semibold'>
-        {pinned.teams.away}
+        {game.away.abbr}
       </Text>
       {scores && (
         <Text className='text-sm text-white font-bold'>
           {String(game.away.score)}
         </Text>
       )}
-      {game && ball === game.home.abbr && <Ball side='home' />}
+      {ball === game.home.abbr && <Ball side='home' />}
       <Text className='text-xs text-neutral-300 font-semibold'>
-        {pinned.teams.home}
+        {game.home.abbr}
       </Text>
       {scores && (
         <Text className='text-sm text-white font-bold'>
@@ -48,7 +41,7 @@ export function PinnedChip({ pinned }: { pinned: PinnedGame }) {
         </Text>
       )}
       <Text className='text-xs text-white' numberOfLines={1}>
-        {game ? status : "–"}
+        {status ?? "–"}
       </Text>
     </View>
   );
@@ -86,14 +79,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-  pinned: {
+  followed: {
     backgroundColor: "rgba(255,255,255,0.12)",
     gap: 5,
-  },
-  tag: {
-    width: 3,
-    height: 14,
-    borderRadius: 2,
   },
   ball: {
     width: 5,

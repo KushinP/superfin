@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/common/Text";
 import { MultiviewColors } from "@/constants/Colors";
 import { LIVE_SCORES_DELAY_DEFAULT_S } from "@/constants/LiveScores";
-import type { LiveScoresView, PinnedGame } from "@/utils/atoms/liveScores";
+import type { LiveScoresView } from "@/utils/atoms/liveScores";
 import { useSettings } from "@/utils/atoms/settings";
 import {
   clampDelaySeconds,
@@ -71,21 +71,15 @@ const detailLines = (t: TFunction, game: GameScore): string[] => {
   return lines;
 };
 
-function YourGame({
-  pinned,
-  delaySeconds,
-}: {
-  pinned: PinnedGame;
-  delaySeconds: number;
-}) {
+/** A followed game in full: score, clock, down, then each detail ESPN gave. */
+function FollowedGame({ game }: { game: GameScore }) {
   const { t } = useTranslation();
-  const { game } = pinned;
-  const scores = game && game.state !== "pre";
+  const scores = game.state !== "pre";
   return (
-    <View style={[styles.card, { borderLeftColor: pinned.color }]}>
+    <View testID={`followed-${game.id}`} style={styles.card}>
       <View style={styles.scoreRow}>
         <Text className='text-base text-neutral-300 font-semibold'>
-          {pinned.teams.away}
+          {game.away.abbr}
         </Text>
         {scores && (
           <Text className='text-lg text-white font-bold'>
@@ -93,31 +87,23 @@ function YourGame({
           </Text>
         )}
         <Text className='text-base text-neutral-300 font-semibold'>
-          {pinned.teams.home}
+          {game.home.abbr}
         </Text>
         {scores && (
           <Text className='text-lg text-white font-bold'>
             {String(game.home.score)}
           </Text>
         )}
-        {game && (
-          <Text className='text-sm text-white'>{gameStatusText(t, game)}</Text>
-        )}
-        {game?.down && (
+        <Text className='text-sm text-white'>{gameStatusText(t, game)}</Text>
+        {game.down && (
           <Text className='text-sm text-neutral-300'>{game.down.text}</Text>
         )}
       </View>
-      {game ? (
-        detailLines(t, game).map((line) => (
-          <Text key={line} className='text-sm text-neutral-300'>
-            {line}
-          </Text>
-        ))
-      ) : (
-        <Text className='text-sm text-neutral-400'>
-          {t("livescores.waiting", { seconds: delaySeconds })}
+      {detailLines(t, game).map((line) => (
+        <Text key={line} className='text-sm text-neutral-300'>
+          {line}
         </Text>
-      )}
+      ))}
     </View>
   );
 }
@@ -162,9 +148,10 @@ function PanelButton({
 
 /**
  * The scores screen's content, the same on a phone sheet and the TV panel:
- * the spoiler delay and its controls, your games in full (last play, win
- * probability, drive, timeouts, leaders), then every other game. Each
- * detail shows only when ESPN gave it, and your games wait for the delay.
+ * the spoiler delay and its controls, the followed games in full (last
+ * play, win probability, drive, timeouts, leaders), then every other game.
+ * Each detail shows only when ESPN gave it, and every game waits for the
+ * delay.
  */
 export function ScoresPanel({ view }: { view: LiveScoresView }) {
   const { t } = useTranslation();
@@ -207,15 +194,15 @@ export function ScoresPanel({ view }: { view: LiveScoresView }) {
         <Text className='text-sm text-neutral-300'>
           {t(UNAVAILABLE_KEYS[view.reason ?? "network"])}
         </Text>
+      ) : view.waiting ? (
+        <Text className='text-sm text-neutral-400'>
+          {t("livescores.waiting", { seconds: view.delaySeconds })}
+        </Text>
       ) : (
         <>
           <View style={styles.yourGames}>
-            {view.pinned.map((pinned) => (
-              <YourGame
-                key={pinned.tileKey}
-                pinned={pinned}
-                delaySeconds={view.delaySeconds}
-              />
+            {view.followed.map((game) => (
+              <FollowedGame key={game.id} game={game} />
             ))}
           </View>
           {view.others.length > 0 && (
@@ -255,6 +242,7 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingLeft: 10,
     borderLeftWidth: 3,
+    borderLeftColor: "rgba(255,255,255,0.6)",
   },
   scoreRow: {
     flexDirection: "row",
