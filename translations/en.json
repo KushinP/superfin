@@ -1570,7 +1570,7 @@
     "delay_less": "Show scores 5 s sooner",
     "turn_off": "Turn live scores off",
     "turn_on": "Turn live scores on",
-    "settings_enabled": "Live scores on multiview tiles",
+    "settings_enabled": "Live scores in multiview and live TV",
     "settings_delay": "Score delay",
     "settings_delay_value": "{{seconds}} s",
     "delay_status": "Scores show {{seconds}} s behind live",
