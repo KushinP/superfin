@@ -38,8 +38,37 @@ private fun acceptsDolbyVisionProfile5(info: MediaCodecInfo, mimeType: String): 
 }
 
 class ExoPlayerModule : Module() {
+    private var mediaKeys: MediaKeySession? = null
+
+    // Null only before React's context exists, when nothing is on screen to
+    // take the keys anyway.
+    private fun mediaKeySession(): MediaKeySession? {
+        mediaKeys?.let { return it }
+        val context = appContext.reactContext?.applicationContext ?: return null
+        return MediaKeySession(context) { key ->
+            sendEvent("onMediaKey", mapOf("key" to key))
+        }.also { mediaKeys = it }
+    }
+
     override fun definition() = ModuleDefinition {
         Name("ExoPlayer")
+
+        // The remote's media keys, from a session JS opens while multiview
+        // or the player is on screen (see MediaKeySession).
+        Events("onMediaKey")
+
+        Function("startMediaKeySession") {
+            mediaKeySession()?.start()
+        }
+
+        Function("stopMediaKeySession") {
+            mediaKeys?.stop()
+        }
+
+        OnDestroy {
+            mediaKeys?.stop()
+            mediaKeys = null
+        }
 
         // Whether the device ships a hardware decoder that accepts a Dolby
         // Vision Profile 5 MediaFormat (see acceptsDolbyVisionProfile5). On

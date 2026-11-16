@@ -453,3 +453,26 @@ export const applyMultiviewKey = (
     state.tiles[Number(id.slice(MULTIVIEW_HEAR_KEY_PREFIX.length)) - 1];
   return tile ? selectAudio(state, tile.key) : state;
 };
+
+/** What a tile tells the screen about itself, for the remote's media keys. */
+export interface TileRemoteState {
+  key: string;
+  /** A movie or episode that is playing or paused, not a live channel. */
+  controllable: boolean;
+  focused: boolean;
+}
+
+/**
+ * Which tile the remote's ⏯ ⏪ ⏩ act on: the focused movie or episode, or
+ * else the only one up. With a movie and a live channel, the focus is often
+ * on the live tile when ⏯ is pressed (Fire TV, 2026-11-15), and the movie is
+ * plainly what was meant. Two movies and neither focused is a guess, so none.
+ */
+export const remoteKeyTarget = (
+  tiles: readonly TileRemoteState[],
+): string | null => {
+  const focused = tiles.find((tile) => tile.focused && tile.controllable);
+  if (focused) return focused.key;
+  const controllable = tiles.filter((tile) => tile.controllable);
+  return controllable.length === 1 ? controllable[0].key : null;
+};

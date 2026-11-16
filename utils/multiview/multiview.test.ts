@@ -14,6 +14,7 @@ import {
   playNext,
   promoteTile,
   reconnectTile,
+  remoteKeyTarget,
   removeTile,
   replaceTile,
   selectAudio,
@@ -440,5 +441,33 @@ describe("tileDrawOrder", () => {
       "k-a",
       "k-b",
     ]);
+  });
+});
+
+describe("remoteKeyTarget", () => {
+  const tile = (key: string, controllable: boolean, focused = false) => ({
+    key,
+    controllable,
+    focused,
+  });
+
+  test("the focused movie takes the keys", () => {
+    expect(remoteKeyTarget([tile("a", true), tile("b", true, true)])).toBe("b");
+  });
+
+  // Fire TV, 2026-11-15: a movie and a live channel up, the focus on the
+  // live tile, ⏯ pressed, and nothing happened.
+  test("the only movie takes them while a live tile has the focus", () => {
+    expect(
+      remoteKeyTarget([tile("live", false, true), tile("movie", true)]),
+    ).toBe("movie");
+  });
+
+  test("two movies and neither focused: no guess", () => {
+    expect(remoteKeyTarget([tile("a", true), tile("b", true)])).toBeNull();
+  });
+
+  test("only live channels: nothing takes them", () => {
+    expect(remoteKeyTarget([tile("live", false, true)])).toBeNull();
   });
 });

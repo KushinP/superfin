@@ -17,6 +17,8 @@ type TileProps = {
   hasTVPreferredFocus?: boolean;
   onTargetRef?: unknown;
   showStats?: boolean;
+  remoteTarget?: boolean;
+  onRemoteState?: (state: { controllable: boolean; focused: boolean }) => void;
 };
 
 /** Each tile's latest props, by item id. */
@@ -136,6 +138,10 @@ jest.mock("@/hooks/useLiveScores", () => ({
     games: [],
     view: { status: "ok", pinned: [], others: [], delaySeconds: 30 },
   }),
+}));
+const mockUseMediaKeySession = jest.fn();
+jest.mock("@/hooks/useMediaKeySession", () => ({
+  useMediaKeySession: () => mockUseMediaKeySession(),
 }));
 jest.mock("@/hooks/useScoresScreen", () => ({
   useScoresScreen: () => mockOpenScores,
@@ -408,5 +414,26 @@ describe("a tile's menu on TV", () => {
 
     expect(mockActionSheet).toHaveBeenCalledTimes(1);
     expect(mockTVMenus).toHaveLength(0);
+  });
+});
+
+describe("the remote's playback keys", () => {
+  // Fire OS sends ⏯ ⏪ ⏩ to the system's media session, never to the app as
+  // key presses (Fire TV, 2026-11-15), so multiview holds one while open.
+  test("multiview holds a media session while open", async () => {
+    mockUseMediaKeySession.mockClear();
+    await render(<MultiviewRoute />);
+    expect(mockUseMediaKeySession).toHaveBeenCalled();
+  });
+
+  test("the only movie tile takes the keys while a live tile has the focus", async () => {
+    await render(<MultiviewRoute />);
+    await act(() => {
+      mockTileProps.a.onRemoteState?.({ controllable: false, focused: true });
+      mockTileProps.b.onRemoteState?.({ controllable: true, focused: false });
+    });
+
+    expect(mockTileProps.a.remoteTarget).toBe(false);
+    expect(mockTileProps.b.remoteTarget).toBe(true);
   });
 });

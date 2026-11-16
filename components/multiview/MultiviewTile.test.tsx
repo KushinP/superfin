@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import type { ComponentProps } from "react";
 import { AppState } from "react-native";
 import { Colors, MultiviewColors } from "@/constants/Colors";
 import { QueryWrapper } from "@/test-utils/queryWrapper";
@@ -151,7 +152,10 @@ import { MultiviewTile } from "./MultiviewTile";
 const onPlayNext = jest.fn();
 const onRemove = jest.fn();
 
-const renderTile = (showLabel = true) =>
+const renderTile = (
+  showLabel = true,
+  extra: Partial<ComponentProps<typeof MultiviewTile>> = {},
+) =>
   render(
     <QueryWrapper>
       <MultiviewTile
@@ -164,6 +168,7 @@ const renderTile = (showLabel = true) =>
         onLongPress={jest.fn()}
         onPlayNext={onPlayNext}
         onRemove={onRemove}
+        {...extra}
       />
     </QueryWrapper>,
   );
@@ -647,6 +652,39 @@ describe("the TV remote's playback keys", () => {
     expect(mockPlayer.pause).not.toHaveBeenCalled();
     expect(mockPlayer.play).not.toHaveBeenCalled();
     expect(mockPlayer.seekBy).not.toHaveBeenCalled();
+  });
+
+  // Fire TV, 2026-11-15: with a movie and a live channel up, the focus is
+  // often on the live tile when ⏯ is pressed. The screen then names the
+  // movie as the keys' target.
+  test("the screen's chosen tile takes them without the focus", async () => {
+    await renderTile(false, { remoteTarget: true });
+
+    await press("playPause");
+    await press("fastForward");
+
+    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.seekBy.mock.calls).toEqual([[30]]);
+  });
+
+  test("a focused tile the screen didn't choose ignores them", async () => {
+    await renderTile(false, { remoteTarget: false });
+    await focus();
+
+    await press("playPause");
+
+    expect(mockPlayer.pause).not.toHaveBeenCalled();
+  });
+
+  test("tells the screen whether it can be controlled and has the focus", async () => {
+    const onRemoteState = jest.fn();
+    await renderTile(false, { onRemoteState });
+    await focus();
+
+    expect(onRemoteState).toHaveBeenLastCalledWith({
+      controllable: true,
+      focused: true,
+    });
   });
 });
 

@@ -49,6 +49,7 @@ import { VideoPlayerView } from "@/components/video-player/VideoPlayerView";
 import { PROGRESS_REPORT_INTERVAL } from "@/constants/Playback";
 import useRouter from "@/hooks/useAppRouter";
 import { useHaptic } from "@/hooks/useHaptic";
+import { useMediaKeySession } from "@/hooks/useMediaKeySession";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useOrientation } from "@/hooks/useOrientation";
 import { usePlaybackManager } from "@/hooks/usePlaybackManager";
@@ -146,6 +147,10 @@ export default function DirectPlayerPage() {
     setIsPlaybackStopped(true);
   }, []);
   const [showControls, _setShowControls] = useState(true);
+  // Fire OS sends the remote's ⏯ ⏪ ⏩ only to a media session, and this
+  // player (all live TV plays here) has none of its own (Fire TV,
+  // 2026-11-15). The native player keeps its own session.
+  useMediaKeySession();
   const [isPipMode, setIsPipMode] = useState(false);
   const [aspectRatio] = useState<"default" | "16:9" | "4:3" | "1:1" | "21:9">(
     "default",

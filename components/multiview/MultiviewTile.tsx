@@ -93,6 +93,13 @@ interface Props {
   onStuck?: () => void;
   /** The tile's video moves: its automatic reconnects start over. */
   onPlaying?: () => void;
+  /**
+   * Whether the remote's ⏯ ⏪ ⏩ act on this tile, chosen by the screen
+   * (remoteKeyTarget). Unset, the tile takes them while it has the focus.
+   */
+  remoteTarget?: boolean;
+  /** Tells the screen whether this tile can be paused and has the focus. */
+  onRemoteState?: (state: { controllable: boolean; focused: boolean }) => void;
 }
 
 // Several players at once: MPV on iOS; on Android TV, ExoPlayer, since
@@ -121,6 +128,8 @@ export function MultiviewTile({
   showStats,
   onStuck,
   onPlaying,
+  remoteTarget,
+  onRemoteState,
 }: Props) {
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -385,7 +394,7 @@ export function MultiviewTile({
   // so on a Fire TV play, pause, forward and rewind did nothing.
   const remoteKey = useRef<(evt: HWEvent) => void>(() => {});
   remoteKey.current = (evt) => {
-    if (!focused || !canControl) return;
+    if (!(remoteTarget ?? focused) || !canControl) return;
     // One press, one action: the release comes as a second event.
     if (evt.eventKeyAction !== undefined && evt.eventKeyAction !== 0) return;
     const player = playerRef.current;
@@ -403,6 +412,12 @@ export function MultiviewTile({
   };
   const onRemoteKey = useCallback((evt: HWEvent) => remoteKey.current(evt), []);
   useTVEventHandler(onRemoteKey);
+
+  const onRemoteStateRef = useRef(onRemoteState);
+  onRemoteStateRef.current = onRemoteState;
+  useEffect(() => {
+    onRemoteStateRef.current?.({ controllable: canControl, focused });
+  }, [canControl, focused]);
 
   return (
     <View
