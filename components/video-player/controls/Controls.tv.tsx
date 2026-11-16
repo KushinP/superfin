@@ -2,6 +2,7 @@ import type {
   BaseItemDto,
   MediaSourceInfo,
 } from "@jellyfin/sdk/lib/generated-client";
+import { useIsFocused } from "@react-navigation/native";
 import { useLocalSearchParams } from "expo-router";
 import { useAtomValue } from "jotai";
 import {
@@ -663,6 +664,8 @@ export const Controls: FC<Props> = ({
   }, []);
 
   const openScores = useScoresScreen();
+  // False while Scores or a track picker, each a screen of its own, is on top.
+  const isScreenFocused = useIsFocused();
   const handleOpenScores = useCallback(() => {
     setLastOpenedModal("scores");
     openScores();
@@ -1181,6 +1184,8 @@ export const Controls: FC<Props> = ({
 
   const { isSliding: isRemoteSliding } = useRemoteControl({
     showControls: showControls,
+    // Scores or a track picker on top: the D-pad is theirs.
+    disableSeeking: !isScreenFocused,
     toggleControls,
     togglePlay,
     isProgressBarFocused,
@@ -1206,7 +1211,9 @@ export const Controls: FC<Props> = ({
     episodeView: false,
     onHideControls: hideControls,
     timeout: TV_AUTO_HIDE_TIMEOUT,
-    disabled: false,
+    // Not while another screen is on top: hiding moves the focus to the
+    // player's overlay, out from under that screen.
+    disabled: !isScreenFocused,
   });
 
   controlsInteractionRef.current = handleControlsInteraction;

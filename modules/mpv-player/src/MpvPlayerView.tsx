@@ -1,6 +1,6 @@
 import { requireNativeView } from "expo";
 import * as React from "react";
-import { useImperativeHandle, useRef } from "react";
+import { useCallback, useImperativeHandle, useRef } from "react";
 
 import {
   MpvPlayerViewProps,
@@ -16,6 +16,15 @@ const PIP_LOG = "[PiP] MpvPlayerView.tsx:";
 export default React.forwardRef<MpvPlayerViewRef, MpvPlayerViewProps>(
   function MpvPlayerView(props, ref) {
     const nativeRef = useRef<any>(null);
+    // The last native view, which React doesn't clear: on unmount React 19
+    // nulls nativeRef before the owner's effect cleanups run, so a destroy()
+    // from a cleanup reached nothing and the player was left holding its
+    // decoder and stream (react19-ref-cleared-before-effect-cleanup).
+    const lastNative = useRef<any>(null);
+    const setNative = useCallback((view: any) => {
+      nativeRef.current = view;
+      if (view) lastNative.current = view;
+    }, []);
 
     useImperativeHandle(ref, () => ({
       play: async () => {
@@ -25,7 +34,11 @@ export default React.forwardRef<MpvPlayerViewRef, MpvPlayerViewProps>(
         await nativeRef.current?.pause();
       },
       destroy: async () => {
-        await nativeRef.current?.destroy();
+        try {
+          await (nativeRef.current ?? lastNative.current)?.destroy();
+        } catch {
+          // The native view may already be gone, released with it.
+        }
       },
       seekTo: async (position: number) => {
         await nativeRef.current?.seekTo(position);
@@ -144,6 +157,6 @@ export default React.forwardRef<MpvPlayerViewRef, MpvPlayerViewProps>(
       },
     }));
 
-    return <NativeView ref={nativeRef} {...props} />;
+    return <NativeView ref={setNative} {...props} />;
   },
 );

@@ -39,8 +39,12 @@ class MediaKeySession(private val context: Context, private val onKey: (String) 
         mainHandler.post { close() }
     }
 
+    // Each open and close is logged: on the Fire TV (2026-11-15) the session
+    // looked active on the home screen, with no player open, and nothing
+    // said when it had been opened or by whom.
     private fun open() {
         if (session != null) return
+        Log.i(TAG, "session opened")
         session = MediaSession(context, "SuperFinMediaKeys").apply {
             setCallback(callback, mainHandler)
             setPlaybackState(
@@ -60,6 +64,7 @@ class MediaKeySession(private val context: Context, private val onKey: (String) 
     }
 
     private fun close() {
+        if (session != null) Log.i(TAG, "session closed")
         session?.apply {
             isActive = false
             release()
