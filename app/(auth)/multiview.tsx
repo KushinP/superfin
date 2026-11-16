@@ -36,6 +36,7 @@ import {
 } from "@/constants/Multiview";
 import useRouter from "@/hooks/useAppRouter";
 import { useLiveScores } from "@/hooks/useLiveScores";
+import { useMediaKeySession } from "@/hooks/useMediaKeySession";
 import { useOrientation } from "@/hooks/useOrientation";
 import { useInvalidatePlaybackProgressCache } from "@/hooks/useRevalidatePlaybackProgressCache";
 import { useScoresScreen } from "@/hooks/useScoresScreen";
@@ -58,8 +59,10 @@ import {
   playNext,
   promoteTile,
   reconnectTile,
+  remoteKeyTarget,
   removeTile,
   setTileQuality,
+  type TileRemoteState,
   tapWhileToolbar,
   tileDrawOrder,
   tileFrames,
@@ -150,6 +153,19 @@ function MultiviewScreen() {
   );
 
   const quality = useMultiviewQualityPicker();
+  // Fire OS sends ⏯ ⏪ ⏩ only to a media session (Fire TV, 2026-11-15).
+  useMediaKeySession();
+  // Each tile's report of whether it can be paused and has the focus, so
+  // the keys reach the only movie up even while a live tile is focused.
+  const [remoteStates, setRemoteStates] = useState<
+    Record<string, Omit<TileRemoteState, "key">>
+  >({});
+  const remoteTarget = remoteKeyTarget(
+    state.tiles.map((tile) => ({
+      key: tile.key,
+      ...(remoteStates[tile.key] ?? { controllable: false, focused: false }),
+    })),
+  );
   // One scores poller for the whole screen, however many tiles show games.
   const liveScores = useLiveScores(
     state.tiles.map((tile) => ({ key: tile.key, itemId: tile.itemId })),
@@ -470,6 +486,10 @@ function MultiviewScreen() {
               showStats={statsTiles.has(tile.key)}
               onStuck={() => setState((s) => autoReconnectTile(s, tile.key))}
               onPlaying={() => setState((s) => markTilePlaying(s, tile.key))}
+              remoteTarget={remoteTarget === tile.key}
+              onRemoteState={(remote) =>
+                setRemoteStates((states) => ({ ...states, [tile.key]: remote }))
+              }
             />
           ) : null,
         )}
