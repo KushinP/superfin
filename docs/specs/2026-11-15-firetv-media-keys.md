@@ -1,6 +1,6 @@
 # Spec: The remote's playback keys reach SuperFin on Fire TV
 
-Status: Approved (Gate 1). Kush: "approve", 2026-11-15.
+Status: Approved (Gates 1 and 2). Kush: "approve", 2026-11-15.
 Date: 2026-11-15
 Branch: `kush/firetv-media-keys`
 Follows: `docs/specs/2026-11-15-multiview-tv-remote-keys.md` (PR #15), which works in tests but not on the device.
