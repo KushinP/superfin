@@ -22,6 +22,11 @@ jest.mock("@/modules/exoplayer-player/src/mediaKeys", () => ({
   },
 }));
 
+const mockWriteDebugLog = jest.fn();
+jest.mock("@/utils/log", () => ({
+  writeDebugLog: (...args: unknown[]) => mockWriteDebugLog(...args),
+}));
+
 import { useTVEventHandler } from "./useTVEventHandler";
 
 const setPlatform = (os: string, isTV: boolean) => {
@@ -38,6 +43,7 @@ describe("useTVEventHandler", () => {
     mockKeyEvents = undefined;
     mockSessionKeys = undefined;
     mockRemove.mockClear();
+    mockWriteDebugLog.mockClear();
     setPlatform("android", true);
   });
 
@@ -92,5 +98,21 @@ describe("useTVEventHandler", () => {
     setPlatform("ios", true);
     await renderHook(() => useTVEventHandler(() => {}));
     expect(mockSessionKeys).toBeUndefined();
+  });
+
+  // Fire TV, 2026-11-15: with the session open nothing played, and the log
+  // couldn't say whether a key had reached the player. Every session key,
+  // and whether it was acted on, now goes to the app log.
+  test("logs each media session key, and whether it was acted on", async () => {
+    await renderHook(() => useTVEventHandler(() => {}));
+    await act(async () => {
+      mockSessionKeys?.("playPause");
+      mockKeyEvents?.({ eventType: "rewind", eventKeyAction: 0 });
+      mockSessionKeys?.("rewind");
+    });
+    expect(mockWriteDebugLog.mock.calls).toEqual([
+      ["Media keys: from the media session", { key: "playPause", acted: true }],
+      ["Media keys: from the media session", { key: "rewind", acted: false }],
+    ]);
   });
 });
