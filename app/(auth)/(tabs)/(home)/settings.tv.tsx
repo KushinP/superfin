@@ -16,6 +16,7 @@ import { TVPasswordEntryModal } from "@/components/login/TVPasswordEntryModal";
 import { TVPINEntryModal } from "@/components/login/TVPINEntryModal";
 import { stillWatchingPresetLabel } from "@/components/settings/stillWatchingPresetLabel";
 import { TVLiveScoresSettings } from "@/components/settings/TVLiveScoresSettings";
+import { TVSeerrSettings } from "@/components/settings/TVSeerrSettings";
 import type { TVOptionItem } from "@/components/tv";
 import {
   TVCustomHeadersSection,
@@ -1010,6 +1011,9 @@ export default function SettingsTV() {
               }
             />
           )}
+
+          {/* Seerr: any server, signed in with the Jellyfin account */}
+          <TVSeerrSettings />
 
           {/* Audio Section */}
           <TVSectionHeader title={t("home.settings.audio.audio_title")} />
