@@ -137,3 +137,52 @@ describe("the remote's ⏪ and ⏩ keys", () => {
     expect(onMinimalSeekLeft).toHaveBeenCalledTimes(1);
   });
 });
+
+// Fire TV review, 2026-11-15: with Scores open over live TV, the player's
+// controls hid after 5 s and left/right between games seeked the picture
+// behind the panel. While another screen is on top, the player leaves the
+// D-pad to it; the remote's own media keys still act on the video.
+describe("with another screen on top (disableSeeking)", () => {
+  const renderCovered = async () => {
+    const handlers = {
+      onMinimalSeekLeft: jest.fn(),
+      onMinimalSeekRight: jest.fn(),
+      onVerticalDpad: jest.fn(),
+      onInteraction: jest.fn(),
+      togglePlay: jest.fn(),
+    };
+    await renderHook(() =>
+      useRemoteControl({
+        showControls: false,
+        toggleControls: jest.fn(),
+        disableSeeking: true,
+        ...handlers,
+      }),
+    );
+    return handlers;
+  };
+
+  test("left, right, up and down do nothing", async () => {
+    const handlers = await renderCovered();
+
+    for (const eventType of ["left", "right", "up", "down"]) {
+      mockTVKeys?.({ eventType, eventKeyAction: 0 });
+    }
+
+    expect(handlers.onMinimalSeekLeft).not.toHaveBeenCalled();
+    expect(handlers.onMinimalSeekRight).not.toHaveBeenCalled();
+    expect(handlers.onVerticalDpad).not.toHaveBeenCalled();
+  });
+
+  test("⏯ ⏪ ⏩ still act on the video", async () => {
+    const handlers = await renderCovered();
+
+    mockTVKeys?.({ eventType: "playPause", eventKeyAction: 0 });
+    mockTVKeys?.({ eventType: "rewind", eventKeyAction: 0 });
+    mockTVKeys?.({ eventType: "fastForward", eventKeyAction: 0 });
+
+    expect(handlers.togglePlay).toHaveBeenCalledTimes(1);
+    expect(handlers.onMinimalSeekLeft).toHaveBeenCalledTimes(1);
+    expect(handlers.onMinimalSeekRight).toHaveBeenCalledTimes(1);
+  });
+});

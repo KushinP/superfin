@@ -9,7 +9,10 @@ import { useSettings } from "@/utils/atoms/settings";
 interface UseRemoteControlProps {
   showControls: boolean;
   toggleControls: () => void;
-  /** When true, disables handling D-pad events (e.g., when settings modal is open) */
+  /**
+   * Another screen is on top (Scores, a track picker): the D-pad is left to
+   * it, and only the remote's ⏯ ⏪ ⏩ still act on the video.
+   */
   disableSeeking?: boolean;
   /** Callback for back/menu button press (tvOS: menu, Android TV: back) */
   onBack?: () => void;
@@ -80,6 +83,7 @@ export function useRemoteControl({
   onVerticalDpad,
   onWillExit,
   onCancelExit,
+  disableSeeking,
 }: UseRemoteControlProps) {
   const { settings } = useSettings();
   const confirmBeforeStoppingRef = useRef(
@@ -189,6 +193,10 @@ export function useRemoteControl({
       else onMinimalSeekRight?.();
       return;
     }
+
+    // Fire TV review, 2026-11-15: with Scores open over live TV, left and
+    // right between games seeked the picture behind the panel.
+    if (disableSeeking) return;
 
     // Handle long press D-pad for continuous seeking (works in both modes)
     // Must be checked BEFORE the showControls check to work when controls are hidden
