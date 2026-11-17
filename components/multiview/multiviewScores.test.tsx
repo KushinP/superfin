@@ -165,7 +165,10 @@ beforeEach(() => {
 describe("live scores on the multiview screen", () => {
   // R1 (v1's A1, now for the rail)
   test("draws the scores rail and keeps it when the toolbar hides", async () => {
-    jest.useFakeTimers();
+    // nextTick and setImmediate stay real, as in the other fake-timer tests:
+    // code set up during this test kept the fake ones, and every later test
+    // in the file waited on them forever (on this Mac, 2026-11-16).
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
     try {
       await render(<MultiviewRoute />);
       expect(screen.getByTestId("scores-rail")).toBeTruthy();
