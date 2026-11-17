@@ -73,8 +73,10 @@ State and data:
 - `use-network-aware-query-client-limitations` | Object.create breaks private fields; only for invalidateQueries
 - `mark-as-played-flow` | PlayedStatus -> useMarkAsPlayed -> playbackManager with optimistic updates
 - `shared-value-js-write-lands-later` | a shared value set from JS is applied later on the UI thread, the next JS read still gets the old one; keep JS-only state in a ref
+- `jellyfin-unknown-parent-answers-400` | GET /Items with a parentId the server no longer has is a 400 "Error processing request.", not a 404; a renamed library has a new id, and the cache restores the old one for a day. Not reported nor retried, one WARN line in the local log
 - `unobserved-query-reports-its-first-failure` | a query whose key changed under it has no observer left, so React Query cancels its retries and its first failure goes to Sentry; one failing request and an instant event in the breadcrumbs is that
 - `react19-ref-cleared-before-effect-cleanup` | on unmount React 19 nulls object refs before effect cleanups run; destroy a native view from a copy the cleanup captured, not ref.current
+- `polling-query-rewrites-persisted-cache` | a persisted query with `refetchInterval` re-serializes the whole persisted cache every tick, even when its data never changes (`withoutRedundantSaves` only skips the ticks of queries that are not persisted); enable it only while a consumer is focused, with `gcTime: 0`
 
 Native modules:
 - `expo-view-props-fail-silently` | `try? prop.set()` drops failed prop conversions with NO error; use a JSON string prop
@@ -113,6 +115,7 @@ Build and tooling:
 - `jest-fake-require-native-module-must-pass-through` | a fake requireNativeModule must answer only its own name; Expo's lazy fetch asks for ExpoFetchModule, and CI failed where the Mac passed
 - `develop-merge-cancels-tv-build` | build-apps cancels develop's running build on each merge; install a PR branch's artifact, or merge everything first and wait for one build
 - `require-hooks-leak-across-jest-specs` | a require hook (tsx/cjs) registered from a spec stays on the Jest worker's Node loader and breaks later specs; map it to a stub
+- `expo-image-prebuilt-glide-logs` | Expo's prebuilt expo-image AAR ships with Glide logs on, every image URL (trickplay ApiKey included) reaches logcat; built from source instead
 
 ## Project overview
 
@@ -297,8 +300,8 @@ import { apiAtom } from "@/utils/atoms/api";
 ## Coding standards
 
 - TypeScript everywhere. The only exceptions are the config files whose loaders cannot
-  parse TypeScript: `babel.config.js`, `jest.perf.config.js`, `metro.config.js`, `react-native.config.js`,
-  `tailwind.config.js`.
+  parse TypeScript: `babel.config.js`, `fingerprint.config.js`, `jest.perf.config.js`, `metro.config.js`,
+  `react-native.config.js`, `tailwind.config.js`.
 - Functional components with hooks.
 - Biome formatting: two space indent, semicolons, LF endings.
 - Reuse the existing atoms, hooks and utilities before adding new ones.
