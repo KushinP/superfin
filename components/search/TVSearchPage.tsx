@@ -2,9 +2,10 @@ import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useAtom } from "jotai";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, ScrollView, TextInput, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/common/Text";
+import { TVInput } from "@/components/login/TVInput";
 import { TVDiscover } from "@/components/seerr/discover/TVDiscover";
 import { useScaledTVSizes } from "@/constants/TVSizes";
 import { useScaledTVTypography } from "@/constants/TVTypography";
@@ -264,21 +265,19 @@ export const TVSearchPage: React.FC<TVSearchPageProps> = ({
               marginBottom: 24,
             }}
           >
-            <TextInput
-              style={{
-                minHeight: 56,
-                width: "100%",
-                backgroundColor: "#262626",
-                borderRadius: 12,
-                paddingHorizontal: 20,
-                fontSize: typography.body,
-                color: "#fff",
-              }}
+            {/* The login screen's field: a box that takes the focus and
+                types only once pressed. A bare TextInput went straight into
+                typing and kept the D-pad, so ↓ never reached Library /
+                Discover (Fire TV, 2026-11-16, ADB). */}
+            <TVInput
+              style={{ fontSize: typography.body }}
               placeholder={t("search.search")}
-              placeholderTextColor='rgba(255,255,255,0.4)'
               onChangeText={setSearch}
               defaultValue=''
               autoFocus={false}
+              autoCapitalize='none'
+              autoCorrect={false}
+              returnKeyType='search'
             />
           </View>
         )}
