@@ -40,6 +40,7 @@ import { getBackdropUrl } from "@/utils/jellyfin/image/getBackdropUrl";
 import { getLogoImageUrlById } from "@/utils/jellyfin/image/getLogoImageUrlById";
 import { scaleSize } from "@/utils/scaleSize";
 import { runtimeTicksToMinutes } from "@/utils/time";
+import { cardAccessibleName } from "@/utils/tv/cardAccessibleName";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -143,6 +144,8 @@ const HeroCard: React.FC<HeroCardProps> = React.memo(
           onFocus={handleFocus}
           onBlur={handleBlur}
           hasTVPreferredFocus={isFirst}
+          accessibilityRole='button'
+          accessibilityLabel={cardAccessibleName(item)}
           style={{ marginRight: sizes.gaps.item }}
         >
           <GlassPosterView
@@ -167,6 +170,9 @@ const HeroCard: React.FC<HeroCardProps> = React.memo(
         onFocus={handleFocus}
         onBlur={handleBlur}
         hasTVPreferredFocus={isFirst}
+        // The Fire TV's screen reader read these cards as "".
+        accessibilityRole='button'
+        accessibilityLabel={cardAccessibleName(item)}
         style={{ marginRight: sizes.gaps.item }}
       >
         <Animated.View
