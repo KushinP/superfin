@@ -643,6 +643,13 @@ const TVPosterCardComponent: React.FC<TVPosterCardProps> = ({
     );
   };
 
+  // What the Fire TV's screen reader says for the card: it read "" or an
+  // icon code before.
+  const accessibleName =
+    item.Type === "Episode" && item.SeriesName
+      ? `${item.SeriesName}, ${item.Name ?? ""}`
+      : (item.Name ?? undefined);
+
   return (
     <View
       style={[
@@ -666,6 +673,8 @@ const TVPosterCardComponent: React.FC<TVPosterCardProps> = ({
         hasTVPreferredFocus={hasTVPreferredFocus && !disabled}
         disabled={disabled && !focusableWhenDisabled}
         focusable={!disabled || focusableWhenDisabled}
+        accessibilityRole='button'
+        accessibilityLabel={accessibleName}
       >
         <Animated.View
           style={{
@@ -680,26 +689,31 @@ const TVPosterCardComponent: React.FC<TVPosterCardProps> = ({
         >
           {renderPosterImage()}
         </Animated.View>
+        {/* Text below the poster, inside the focusable part but outside
+            the zoom: Android scrolls a list to show the focused view, and
+            with the text outside it the focused row's titles stayed off
+            screen and ↓ often only scrolled (Fire TV, 2026-11-16, ADB). */}
+        {showText && (
+          <View
+            style={{
+              marginTop: scaleSize(12),
+              paddingHorizontal: scaleSize(4),
+            }}
+          >
+            {item.Type === "Episode" && !displayShowName ? (
+              <>
+                {renderSubtitle()}
+                {renderTitle()}
+              </>
+            ) : (
+              <>
+                {renderTitle()}
+                {renderSubtitle()}
+              </>
+            )}
+          </View>
+        )}
       </Pressable>
-
-      {/* Text below poster */}
-      {showText && (
-        <View
-          style={{ marginTop: scaleSize(12), paddingHorizontal: scaleSize(4) }}
-        >
-          {item.Type === "Episode" && !displayShowName ? (
-            <>
-              {renderSubtitle()}
-              {renderTitle()}
-            </>
-          ) : (
-            <>
-              {renderTitle()}
-              {renderSubtitle()}
-            </>
-          )}
-        </View>
-      )}
     </View>
   );
 };
