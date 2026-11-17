@@ -85,6 +85,7 @@ import { TechnicalInfoOverlay } from "./TechnicalInfoOverlay";
 import { TrickplayBubble } from "./TrickplayBubble";
 import type { Track } from "./types";
 import { useControlsTimeout } from "./useControlsTimeout";
+import { tvTrickplayScale } from "./utils/tvTrickplayScale";
 
 interface Props {
   item: BaseItemDto;
@@ -130,13 +131,10 @@ interface Props {
 const TV_SEEKBAR_HEIGHT = 14;
 const TV_AUTO_HIDE_TIMEOUT = 5000;
 
-// Trickplay bubble positioning constants
-const TV_TRICKPLAY_SCALE = 1.8;
+// Trickplay bubble positioning constants. The scale itself follows the
+// screen's width (tvTrickplayScale): a fixed 1.8 drew it nearly half a Fire
+// TV's screen wide.
 const TV_TRICKPLAY_BUBBLE_BASE_WIDTH = CONTROLS_CONSTANTS.TILE_WIDTH * 1.5;
-const TV_TRICKPLAY_BUBBLE_WIDTH =
-  TV_TRICKPLAY_BUBBLE_BASE_WIDTH * TV_TRICKPLAY_SCALE;
-const TV_TRICKPLAY_INTERNAL_OFFSET = 62 * TV_TRICKPLAY_SCALE;
-const TV_TRICKPLAY_CENTERING_OFFSET = 98 * TV_TRICKPLAY_SCALE;
 const TV_TRICKPLAY_LEFT_PADDING = 40;
 const TV_TRICKPLAY_RIGHT_PADDING = 110;
 const TV_TRICKPLAY_FADE_DURATION = 200;
@@ -183,11 +181,17 @@ const TVTrickplayBubblePositioned: FC<TVTrickplayBubbleProps> = ({
     });
   }, [visible, opacity]);
 
-  const minX = TV_TRICKPLAY_INTERNAL_OFFSET + TV_TRICKPLAY_LEFT_PADDING;
+  const { width: screenWidth } = useWindowDimensions();
+  const scale = tvTrickplayScale(screenWidth);
+  const bubbleWidth = TV_TRICKPLAY_BUBBLE_BASE_WIDTH * scale;
+  const internalOffset = 62 * scale;
+  const centeringOffset = 98 * scale;
+
+  const minX = internalOffset + TV_TRICKPLAY_LEFT_PADDING;
   const maxX =
     progressBarWidth -
-    TV_TRICKPLAY_BUBBLE_WIDTH +
-    TV_TRICKPLAY_INTERNAL_OFFSET +
+    bubbleWidth +
+    internalOffset +
     TV_TRICKPLAY_RIGHT_PADDING;
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -197,9 +201,7 @@ const TVTrickplayBubblePositioned: FC<TVTrickplayBubbleProps> = ({
       minX,
       Math.min(
         maxX,
-        progressPercent * progressBarWidth -
-          TV_TRICKPLAY_BUBBLE_WIDTH / 2 +
-          TV_TRICKPLAY_CENTERING_OFFSET,
+        progressPercent * progressBarWidth - bubbleWidth / 2 + centeringOffset,
       ),
     );
 
@@ -215,7 +217,7 @@ const TVTrickplayBubblePositioned: FC<TVTrickplayBubbleProps> = ({
         trickPlayUrl={trickPlayUrl}
         trickplayInfo={trickplayInfo}
         time={time}
-        imageScale={TV_TRICKPLAY_SCALE}
+        imageScale={scale}
       />
     </Animated.View>
   );

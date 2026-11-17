@@ -76,3 +76,11 @@ export const LIVE_PAUSE_WAIT_SECONDS = 5;
  * (2026-11-15); a real second press comes well over this apart.
  */
 export const MEDIA_KEY_DEDUPE_MS = 300;
+
+/**
+ * How much of the screen's width the TV player's seek preview (trickplay)
+ * takes. 22.5% is what Apple TV showed (scale 1.8 on 1920 units); a Fire TV
+ * lays out 960 units, so the same fixed scale covered nearly half its screen
+ * ("HUGE", 2026-11-16). The scale is now worked out from the screen.
+ */
+export const TV_TRICKPLAY_SCREEN_FRACTION = 0.225;
