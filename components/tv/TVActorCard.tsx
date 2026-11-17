@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Animated, Pressable, View, type ViewInstance } from "react-native";
 import { Image } from "@/components/common/ServerImage";
 import { Text } from "@/components/common/Text";
 import { TV_IMAGE_QUALITY } from "@/constants/Images";
@@ -19,7 +19,7 @@ export interface TVActorCardProps {
   hasTVPreferredFocus?: boolean;
 }
 
-export const TVActorCard = React.forwardRef<View, TVActorCardProps>(
+export const TVActorCard = React.forwardRef<ViewInstance, TVActorCardProps>(
   ({ person, apiBasePath, onPress, hasTVPreferredFocus }, ref) => {
     const typography = useScaledTVTypography();
     const { focused, handleFocus, handleBlur, animatedStyle } =

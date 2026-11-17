@@ -1,8 +1,6 @@
 import { getLibraryApi } from "@jellyfin/sdk/lib/utils/api";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
-import { useRoute } from "expo-router/react-navigation";
 import { useAtom } from "jotai";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,18 +9,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/common/Text";
 import { Loader } from "@/components/Loader";
 import { MusicAlbumRowCard } from "@/components/music/MusicAlbumRowCard";
+import { useMusicLibraryId } from "@/components/music/MusicLibraryContext";
 import { Colors } from "@/constants/Colors";
 import { apiAtom, userAtom } from "@/providers/JellyfinProvider";
 
 const ITEMS_PER_PAGE = 40;
 
 export default function AlbumsScreen() {
-  const localParams = useLocalSearchParams<{ libraryId?: string | string[] }>();
-  const route = useRoute<any>();
-  const libraryId =
-    (Array.isArray(localParams.libraryId)
-      ? localParams.libraryId[0]
-      : localParams.libraryId) ?? route?.params?.libraryId;
+  const libraryId = useMusicLibraryId();
   const [api] = useAtom(apiAtom);
   const [user] = useAtom(userAtom);
   const insets = useSafeAreaInsets();
@@ -100,7 +94,9 @@ export default function AlbumsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={false}
-            onRefresh={refetch}
+            onRefresh={() => {
+              refetch();
+            }}
             tintColor={Colors.primary}
           />
         }

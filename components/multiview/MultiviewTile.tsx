@@ -8,11 +8,11 @@ import { useTranslation } from "react-i18next";
 import {
   AppState,
   findNodeHandle,
-  type HWEvent,
   Platform,
   Pressable,
   StyleSheet,
   View,
+  type ViewInstance,
 } from "react-native";
 import { Text } from "@/components/common/Text";
 import { Loader } from "@/components/Loader";
@@ -27,6 +27,7 @@ import {
   MULTIVIEW_STALL_DELAY,
 } from "@/constants/Multiview";
 import { useMultiviewTileStream } from "@/hooks/useMultiviewTileStream";
+import type { TVRemoteKeyEvent } from "@/hooks/useTVEventHandler";
 import { useTVEventHandler } from "@/hooks/useTVEventHandler";
 import { ExoPlayerView, MpvPlayerView, type MpvPlayerViewRef } from "@/modules";
 import { apiAtom, userAtom } from "@/utils/atoms/api";
@@ -195,7 +196,7 @@ export function MultiviewTile({
     void playerRef.current?.setMute(muted);
   }, [muted]);
 
-  const target = useRef<View>(null);
+  const target = useRef<ViewInstance>(null);
   useEffect(() => {
     if (focusRequest === undefined) return;
     (
@@ -392,7 +393,7 @@ export function MultiviewTile({
   // buttons are out of a TV remote's reach: they sit inside the tile's own
   // focus target, and Android's focus search only moves to its neighbours,
   // so on a Fire TV play, pause, forward and rewind did nothing.
-  const remoteKey = useRef<(evt: HWEvent) => void>(() => {});
+  const remoteKey = useRef<(evt: TVRemoteKeyEvent) => void>(() => {});
   remoteKey.current = (evt) => {
     if (!(remoteTarget ?? focused) || !canControl) return;
     // One press, one action: the release comes as a second event.
@@ -410,7 +411,10 @@ export function MultiviewTile({
       control(() => void player?.seekBy(MULTIVIEW_SEEK_FORWARD_SECONDS))();
     }
   };
-  const onRemoteKey = useCallback((evt: HWEvent) => remoteKey.current(evt), []);
+  const onRemoteKey = useCallback(
+    (evt: TVRemoteKeyEvent) => remoteKey.current(evt),
+    [],
+  );
   useTVEventHandler(onRemoteKey);
 
   const onRemoteStateRef = useRef(onRemoteState);
@@ -495,7 +499,7 @@ export function MultiviewTile({
         testID='multiview-tile-target'
         ref={(view) => {
           target.current = view;
-          onTargetRef?.(view ? findNodeHandle(view) : null);
+          onTargetRef?.(view ? (findNodeHandle(view) ?? null) : null);
         }}
         nextFocusUp={nextFocusUp}
         style={StyleSheet.absoluteFill}
