@@ -255,3 +255,34 @@ it as a repository secret with that name. I never see it.
   makes it possible.
 - Spec said the robot's token is out of scope → plan section 9 only explains how Kush
   makes it.
+
+## Changes
+
+- 2026-11-16, step 1: upstream moved notification setup into
+  `hooks/useNotificationRegistration.ts` with Streamyfin's EAS project written
+  in. The hook asks for a push token only with the build's own project
+  (`utils/pushProjectId`), as SuperFin did before; two tests cover it.
+- 2026-11-16, step 2: Jest 30 (SDK 58) no longer hangs on
+  `multiviewScores.test.tsx`, but the commit hook's `expo-doctor` fails: 26
+  Expo packages are a patch or two behind SDK 58's newest, upstream's tip
+  included. CI runs doctor as non-blocking. Kush committed from his terminal;
+  the patch bump is a separate PR after the merge, with its own approval.
+- 2026-11-16, step 2: the Live TV tab, Mac sidebar and dead-link test landed
+  as one commit, not three (a commit command ran with both sets staged).
+- 2026-11-16, step 2: the Mac sidebar is loaded only on the Mac. Imported at
+  the top of the tab layout, it pulled the item code into every layout test
+  and into phone and TV start-up.
+- 2026-11-16, step 3: not in the plan, found in the merge:
+  - ExoPlayer: upstream's bounded buffer pool (#2418) would hold ~384 MB for
+    four multiview tiles in a 256 MB heap. A tile gets a quarter of the pool
+    and 10s ahead.
+  - The iOS player's keys: upstream's `PlayerKeyboardPolicy` and SuperFin's
+    `PlayerKeyBindings` both declared `PlayerKeyAction` and both overrode
+    `keyCommands`, which does not compile. Upstream's owns space and the
+    arrows; SuperFin's keeps ↑ ↓, M and Esc.
+  - The phone scores sheet caps its own height at half the window: upstream's
+    shared sheet dropped snap points.
+  - Three upstream tests of the phone guide SuperFin replaced were dropped,
+    approved by Kush; the clock change cases now test SuperFin's guide.
+- 2026-11-16: develop's #27, #28 and #29 were merged into each step branch
+  while the PRs were prepared, combining `TVPosterCard.test.tsx`.

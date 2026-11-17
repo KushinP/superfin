@@ -875,3 +875,38 @@ describe("the default quality", () => {
     expect(effectiveQuality()).toEqual({ key: "Max", value: undefined });
   });
 });
+
+// SuperFin's upstream catch-up (docs/specs/2026-11-16-upstream-catchup.md,
+// check A7): settings saved by the build before it load unchanged, the fork's
+// own keys included, and upstream's new Auto quality settings take their
+// defaults. A quality the user chose stays theirs: only a fresh install
+// starts on Auto.
+describe("settings saved before the upstream catch-up", () => {
+  const savedBefore = {
+    defaultBitrate: { key: "4 Mb/s", value: 4_000_000 },
+    multiviewMaxBitrate: { key: "2 Mb/s", value: 2_000_000 },
+    liveScoresEnabled: false,
+    liveScoresDelaySeconds: 45,
+    ambientBackgrounds: false,
+    streamyStatsServerUrl: "https://stats.example.com",
+  };
+
+  test("load unchanged, with upstream's new settings at their defaults", async () => {
+    storage.set(SETTINGS_KEY, JSON.stringify(savedBefore));
+    getDefaultStore().set(settingsAtom, null);
+
+    const { result } = await renderHook(() => useSettings());
+
+    expect(result.current.settings).toMatchObject(savedBefore);
+    expect(defaultValues.autoBitrateAdapt).toBe(true);
+    expect(result.current.settings.autoBitrateAdapt).toBe(true);
+    expect(defaultValues.autoBitrateRatio).toEqual(expect.any(Number));
+    expect(result.current.settings.autoBitrateRatio).toBe(
+      defaultValues.autoBitrateRatio,
+    );
+    // Nothing the user saved is written over on the way in.
+    expect(JSON.parse(storage.getString(SETTINGS_KEY) ?? "{}")).toMatchObject(
+      savedBefore,
+    );
+  });
+});
