@@ -88,6 +88,11 @@ export function Input(props: InputProps) {
               fontWeight: "400",
               color: "#FFFFFF",
               backgroundColor: "transparent",
+              // Android pads a TextInput inside its height by default; in a
+              // fixed-height box sized for 28 px TV text that cut the text's
+              // top off (Fire TV, 2026-11-17: multiview's "Search channels").
+              paddingVertical: 0,
+              textAlignVertical: "center",
             },
             style,
           ]}
