@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleProp,
+  TVFocusGuideView,
   useWindowDimensions,
   ViewStyle,
 } from "react-native";
@@ -177,32 +178,41 @@ export const TVNavBar: React.FC<TVNavBarProps> = ({
         style,
       ]}
     >
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps='handled'
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          gap: scaleSize(12),
-          // Room for a focused tab's 1.05 scale: a horizontal ScrollView
-          // clips on Android, and the tab lost its top edge.
-          paddingVertical: scaleSize(TV_NAV_BAR_FOCUS_ROOM),
-        }}
+      {/* Sideways at the ends the focus stays in the bar: ← on Home left it
+          for the page's first card and hid the bar (Fire TV, 2026-11-16).
+          Up and down are left alone, so the page stays reachable. */}
+      <TVFocusGuideView
+        testID='tv-nav-bar-focus-guide'
+        trapFocusLeft
+        trapFocusRight
       >
-        {tabs.map((tab) => (
-          <TVNavBarTabItem
-            key={tab.key}
-            label={tab.label}
-            isActive={tab.key === activeTabKey}
-            onSelect={() => handleTabChange(tab.key)}
-            onLayout={handleTabLayout(tab.key)}
-            hasTVPreferredFocus={tab.key === activeTabKey}
-            onFocusChange={onFocusChange}
-          />
-        ))}
-      </ScrollView>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps='handled'
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+            gap: scaleSize(12),
+            // Room for a focused tab's 1.05 scale: a horizontal ScrollView
+            // clips on Android, and the tab lost its top edge.
+            paddingVertical: scaleSize(TV_NAV_BAR_FOCUS_ROOM),
+          }}
+        >
+          {tabs.map((tab) => (
+            <TVNavBarTabItem
+              key={tab.key}
+              label={tab.label}
+              isActive={tab.key === activeTabKey}
+              onSelect={() => handleTabChange(tab.key)}
+              onLayout={handleTabLayout(tab.key)}
+              hasTVPreferredFocus={tab.key === activeTabKey}
+              onFocusChange={onFocusChange}
+            />
+          ))}
+        </ScrollView>
+      </TVFocusGuideView>
     </Animated.View>
   );
 };
