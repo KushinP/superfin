@@ -277,7 +277,12 @@ export function MultiviewPicker({ visible, onScreen, onPick, onClose }: Props) {
               autoCorrect={false}
               autoCapitalize='none'
               returnKeyType='search'
-              extraClassName='bg-neutral-800 py-2.5'
+              // On TV the Input is a fixed-height pill sized for TV text; the
+              // phone padding ate into that height and cut "Search channels"
+              // in half (Fire TV, 2026-11-17).
+              extraClassName={
+                Platform.isTV ? undefined : "bg-neutral-800 py-2.5"
+              }
             />
           </View>
           <View

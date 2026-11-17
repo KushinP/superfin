@@ -9,6 +9,7 @@ import { InfiniteScrollingCollectionList } from "@/components/home/InfiniteScrol
 import { TVChannelsGrid } from "@/components/livetv/TVChannelsGrid";
 import { TVLiveTVGuide } from "@/components/livetv/TVLiveTVGuide";
 import { TVLiveTVPlaceholder } from "@/components/livetv/TVLiveTVPlaceholder";
+import { TVSubTabRow } from "@/components/tv/TVSubTabRow";
 import { TVTabButton } from "@/components/tv/TVTabButton";
 import { useScaledTVTypography } from "@/constants/TVTypography";
 import useRouter from "@/hooks/useAppRouter";
@@ -242,12 +243,7 @@ export const TVLiveTVPage: React.FC = () => {
         </Text>
 
         {/* Tab Bar */}
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-          }}
-        >
+        <TVSubTabRow>
           {TABS.map((tab) => (
             <TVTabButton
               key={tab.id}
@@ -266,7 +262,7 @@ export const TVLiveTVPage: React.FC = () => {
               onSelect={() => router.push("/multiview")}
             />
           )}
-        </View>
+        </TVSubTabRow>
       </View>
 
       {/* Tab Content */}

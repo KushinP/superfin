@@ -151,6 +151,18 @@ describe("with a TV remote", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
+  // Fire TV, 2026-11-17, screenshot: "Search channels" showed only its lower
+  // half. On TV the shared Input is a fixed-height pill sized for TV text, and
+  // the picker's phone padding (py-2.5) ate into that height and pushed the
+  // text up out of the box. Kush: "search bar in multiview when adding media
+  // appears weird".
+  test("the search field gets no phone padding, so its text isn't clipped", async () => {
+    await renderPicker();
+    await screen.findByText("WBZ-DT");
+    const field = screen.getByPlaceholderText("multiview.search_channels");
+    expect(field.props.extraClassName ?? "").not.toMatch(/\bpy-/);
+  });
+
   test("the dimmed side can't take focus: selecting it would close the picker", async () => {
     await renderPicker();
     await screen.findByText("WBZ-DT");
