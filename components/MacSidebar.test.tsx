@@ -62,7 +62,7 @@ describe("MacSidebar", () => {
     expect(screen.queryByText("Books")).toBeNull();
     // Live TV is a section of its own, not a library row.
     expect(screen.queryByTestId("mac-sidebar-library-live")).toBeNull();
-    expect(screen.getByTestId("mac-sidebar-(livetv)")).toBeTruthy();
+    expect(screen.getByTestId("mac-sidebar-livetv")).toBeTruthy();
     fireEvent.press(screen.getByTestId("mac-sidebar-library-movies"));
     expect(mockRouter.navigate).toHaveBeenCalledWith(
       "/(auth)/(tabs)/(libraries)/movies",
@@ -77,25 +77,26 @@ describe("MacSidebar", () => {
       screen.getByTestId("mac-sidebar-library-movies").props.accessibilityState,
     ).toEqual({ selected: true });
     expect(
-      screen.getByTestId("mac-sidebar-(libraries)").props.accessibilityState,
+      screen.getByTestId("mac-sidebar-libraries").props.accessibilityState,
     ).toEqual({ selected: false });
   });
 
   test("lists the tabs and marks the one on screen", async () => {
     await render(<MacSidebar />);
     expect(screen.getByText("t:tabs.home")).toBeTruthy();
-    expect(screen.getByText("t:tabs.custom_links")).toBeTruthy();
+    // Upstream took Custom links out of the TV bar; the Mac follows it.
+    expect(screen.queryByText("t:tabs.custom_links")).toBeNull();
     expect(
-      screen.getByTestId("mac-sidebar-(home)").props.accessibilityState,
+      screen.getByTestId("mac-sidebar-home").props.accessibilityState,
     ).toEqual({ selected: true });
     expect(
-      screen.getByTestId("mac-sidebar-(search)").props.accessibilityState,
+      screen.getByTestId("mac-sidebar-search").props.accessibilityState,
     ).toEqual({ selected: false });
   });
 
   test("a section opens its tab", async () => {
     await render(<MacSidebar />);
-    fireEvent.press(screen.getByTestId("mac-sidebar-(libraries)"));
+    fireEvent.press(screen.getByTestId("mac-sidebar-libraries"));
     expect(mockRouter.navigate).toHaveBeenCalledWith(
       "/(auth)/(tabs)/(libraries)",
     );
@@ -103,8 +104,29 @@ describe("MacSidebar", () => {
 
   test("Home again scrolls it to the top, as the tab bar's tab does", async () => {
     await render(<MacSidebar />);
-    fireEvent.press(screen.getByTestId("mac-sidebar-(home)"));
+    fireEvent.press(screen.getByTestId("mac-sidebar-home"));
     expect(mockEmit).toHaveBeenCalledWith("scrollToTop");
+  });
+
+  // Favorites lives in More's stack now; the sidebar marks its own row, not
+  // Watchlists, which shares the group.
+  test("Favorites opens inside More and is marked there", async () => {
+    mockSegments = ["(auth)", "(tabs)", "(more)", "favorites"];
+    await render(<MacSidebar />);
+    expect(
+      screen.getByTestId("mac-sidebar-favorites").props.accessibilityState,
+    ).toEqual({ selected: true });
+    expect(
+      screen.getByTestId("mac-sidebar-home").props.accessibilityState,
+    ).toEqual({ selected: false });
+  });
+
+  test("a section in More opens its page", async () => {
+    await render(<MacSidebar />);
+    fireEvent.press(screen.getByTestId("mac-sidebar-favorites"));
+    expect(mockRouter.navigate).toHaveBeenCalledWith(
+      "/(auth)/(tabs)/(more)/favorites",
+    );
   });
 
   test("Settings opens the settings screen", async () => {

@@ -35,7 +35,8 @@ export const APP_KEY_COMMANDS: AppKeyCommand[] = [
     input: "3",
     modifiers: ["command"],
     titleKey: "tabs.favorites",
-    action: { kind: "tab", href: "/(auth)/(tabs)/(favorites)" },
+    // Upstream moved Favorites into More's stack (Expo SDK 58 tab layout).
+    action: { kind: "tab", href: "/(auth)/(tabs)/(more)/favorites" },
   },
   {
     id: "tab-library",

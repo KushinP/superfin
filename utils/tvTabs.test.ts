@@ -66,3 +66,29 @@ describe("isTVTabGone", () => {
     expect(isTVTabGone(undefined, false)).toBe(false);
   });
 });
+
+// SuperFin: Live TV is a tab of its own on TV, after Favorites, as it was in
+// the bar before upstream's tab layout (docs/specs/2026-11-16-upstream-catchup.md).
+describe("the Live TV tab", () => {
+  test("sits after Favorites when the user has Live TV", () => {
+    expect(tvTabGroups(true, true)).toEqual([
+      "(home)",
+      "(search)",
+      "(tv-favorites)",
+      "(livetv)",
+      "(tv-watchlists)",
+      "(libraries)",
+      "(tv-settings)",
+    ]);
+  });
+
+  test("is left out without Live TV", () => {
+    expect(tvTabGroups(true, false)).not.toContain("(livetv)");
+    expect(tvTabGroups(false)).not.toContain("(livetv)");
+  });
+
+  test("is gone once the user no longer has Live TV", () => {
+    expect(isTVTabGone("(livetv)", true, false)).toBe(true);
+    expect(isTVTabGone("(livetv)", true, true)).toBe(false);
+  });
+});

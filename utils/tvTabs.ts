@@ -17,6 +17,8 @@ const TV_TAB_GROUPS = [
   "(home)",
   "(search)",
   "(tv-favorites)",
+  // SuperFin: Live TV is its own tab, shown when the server has it.
+  "(livetv)",
   "(tv-watchlists)",
   "(libraries)",
   "(tv-settings)",
@@ -25,12 +27,20 @@ const TV_TAB_GROUPS = [
 export type TVTabGroup = (typeof TV_TAB_GROUPS)[number];
 
 /** The tab groups of the TV bar, in order. Spec: utils/tvTabs.test.ts. */
-export const tvTabGroups = (watchlists: boolean): TVTabGroup[] =>
-  TV_TAB_GROUPS.filter((group) => watchlists || group !== "(tv-watchlists)");
+export const tvTabGroups = (
+  watchlists: boolean,
+  liveTv = false,
+): TVTabGroup[] =>
+  TV_TAB_GROUPS.filter(
+    (group) =>
+      (watchlists || group !== "(tv-watchlists)") &&
+      (liveTv || group !== "(livetv)"),
+  );
 
 /**
  * Whether the user is on a TV tab the bar no longer shows, which happens when
- * a settings refresh turns watchlists off while they are open: the page would
+ * a settings refresh turns watchlists off while they are open, or the Live TV
+ * library goes (SuperFin): the page would
  * stay on screen with no tab selected. Only the bar's own groups count, since
  * a page pushed into `(more)` or a shared group is not a tab that left.
  * Spec: utils/tvTabs.test.ts.
@@ -38,6 +48,7 @@ export const tvTabGroups = (watchlists: boolean): TVTabGroup[] =>
 export const isTVTabGone = (
   currentTab: string | undefined,
   watchlists: boolean,
+  liveTv = false,
 ): boolean =>
   (TV_TAB_GROUPS as readonly string[]).includes(currentTab ?? "") &&
-  !(tvTabGroups(watchlists) as string[]).includes(currentTab ?? "");
+  !(tvTabGroups(watchlists, liveTv) as string[]).includes(currentTab ?? "");

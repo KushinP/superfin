@@ -28,6 +28,11 @@ jest.mock("@/components/music/MiniPlayerBar", () => ({
 jest.mock("@/components/music/MusicPlaybackEngine", () => ({
   MusicPlaybackEngine: () => null,
 }));
+// SuperFin's Live TV tab asks the server for its libraries; these tests do
+// not look at it.
+jest.mock("@/hooks/useLiveTvAvailable", () => ({
+  useLiveTvAvailable: () => false,
+}));
 
 // The native tab bar is not in Jest: a stand-in that keeps the props each
 // trigger was given.
