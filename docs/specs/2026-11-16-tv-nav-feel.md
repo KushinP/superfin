@@ -65,3 +65,4 @@ Kush: "for looking at seasons I have to click down one extra time just to get th
 ## Changes
 
 - 2026-11-16, while planning: P0-1 for `TVPosterCard` (Home, Search, Seerr rows) shipped in #27, from the bug session, and leaving the Search box in #28. This spec's work is what remains: the other card types, P0-2 and P0-3.
+- 2026-11-17, step 2: rows were skipped at a calm 1.5 s pace too, not only on quick presses, because Android picked the next card by position across rows scrolled sideways. Each Home row (`InfiniteScrollingCollectionList.tv`) is now a `TVFocusGuideView` with `autoFocus`, as docs/tv-focus-guide.md recommends, which also covers P1 (keeping your place in a row). Settings' ↑ (E) waits for the upstream catch-up, which moves Settings into a "More" tab (#33, #34).
