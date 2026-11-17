@@ -118,6 +118,9 @@ export const TVSeriesSeasonCard: React.FC<TVSeriesSeasonCardProps> = ({
           }
         }}
         hasTVPreferredFocus={hasTVPreferredFocus}
+        focusable
+        accessibilityRole='button'
+        accessibilityLabel={title}
       >
         <Animated.View
           style={{
@@ -132,33 +135,37 @@ export const TVSeriesSeasonCard: React.FC<TVSeriesSeasonCardProps> = ({
         >
           {renderPoster()}
         </Animated.View>
-      </Pressable>
-
-      <View style={{ marginTop: scaleSize(12) }}>
-        <Text
-          style={{
-            fontSize: typography.callout,
-            fontWeight: "500",
-            color: "#FFFFFF",
-          }}
-          numberOfLines={2}
-        >
-          {title}
-        </Text>
-
-        {subtitle && (
+        {/* Text below the poster, inside the focusable part but outside
+            the zoom: Android scrolls a list to show the focused view, and
+            with the text outside it the seasons row's titles stayed off
+            screen until another ↓ (Kush, Fire TV, 2026-11-16). As #27 did
+            for TVPosterCard. */}
+        <View style={{ marginTop: scaleSize(12) }}>
           <Text
             style={{
               fontSize: typography.callout,
-              color: "#9CA3AF",
-              marginTop: scaleSize(4),
+              fontWeight: "500",
+              color: "#FFFFFF",
             }}
-            numberOfLines={1}
+            numberOfLines={2}
           >
-            {subtitle}
+            {title}
           </Text>
-        )}
-      </View>
+
+          {subtitle && (
+            <Text
+              style={{
+                fontSize: typography.callout,
+                color: "#9CA3AF",
+                marginTop: scaleSize(4),
+              }}
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+      </Pressable>
     </View>
   );
 };
