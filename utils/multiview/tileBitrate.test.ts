@@ -56,3 +56,25 @@ describe("tileMaxBitrate with a tile's own quality", () => {
     ).toBeUndefined();
   });
 });
+
+// Upstream's Auto quality measures the connection for one player; four tiles
+// share that connection, so a tile never streams at Auto
+// (docs/specs/2026-11-16-upstream-catchup-plan.md, section 2, step 3).
+describe("tileMaxBitrate and Auto", () => {
+  const { AUTO_BITRATE } = jest.requireActual("@/utils/bitrate");
+
+  test("the full player's Auto default does not reach a tile", () => {
+    expect(tileMaxBitrate({ defaultBitrate: AUTO_BITRATE })).toBe(
+      DEFAULT_MULTIVIEW_BITRATE.value,
+    );
+  });
+
+  test("an Auto that reaches the setting or a tile is the tile cap", () => {
+    expect(tileMaxBitrate({ multiviewMaxBitrate: AUTO_BITRATE })).toBe(
+      DEFAULT_MULTIVIEW_BITRATE.value,
+    );
+    expect(tileMaxBitrate({}, AUTO_BITRATE)).toBe(
+      DEFAULT_MULTIVIEW_BITRATE.value,
+    );
+  });
+});

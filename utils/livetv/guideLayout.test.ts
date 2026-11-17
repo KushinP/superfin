@@ -176,3 +176,34 @@ describe("guideDays", () => {
     ]);
   });
 });
+
+// Upstream's clock-change cases (components/livetv/HourHeader.test.ts, #2448),
+// on SuperFin's own guide. The suite runs in New York's time zone
+// (test-utils/timeZone.ts), where the clocks went from 2:00 to 3:00 on
+// 8 March 2026 and back on 1 November.
+describe("guideHours on the days the clocks change", () => {
+  const otherDay = new Date(2026, 0, 1).getTime();
+  const hoursOf = (day: Date) =>
+    guideHours(guideWindow(day, otherDay)).map((hour) => hour.getHours());
+
+  test("skips the hour the clocks skip, without a second 3:00", () => {
+    const hours = hoursOf(new Date(2026, 2, 8));
+    expect(hours.slice(0, 4)).toEqual([0, 1, 3, 4]);
+    expect(hours).toHaveLength(23);
+  });
+
+  test("shows the hour the clocks repeat twice", () => {
+    const hours = hoursOf(new Date(2026, 10, 1));
+    expect(hours.slice(0, 4)).toEqual([0, 1, 1, 2]);
+    expect(hours).toHaveLength(25);
+  });
+
+  test("keeps one elapsed hour between cells", () => {
+    const times = guideHours(guideWindow(new Date(2026, 2, 8), otherDay)).map(
+      (hour) => hour.getTime(),
+    );
+    expect(new Set(times.slice(1).map((t, i) => t - times[i]))).toEqual(
+      new Set([3_600_000]),
+    );
+  });
+});

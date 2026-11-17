@@ -1,6 +1,6 @@
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useCallback } from "react";
-import { Platform } from "react-native";
+import { Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScoresScreenContent } from "@/components/multiview/ScoresScreenContent";
 import useRouter from "@/hooks/useAppRouter";
@@ -13,8 +13,12 @@ function ScoresSheet({
   onClose: () => void;
   bottomInset: number;
 }) {
+  const { height: windowHeight } = useWindowDimensions();
   return (
+    // The shared sheet sizes itself to its content (upstream dropped its snap
+    // points), so the scores list caps itself at the bottom half.
     <BottomSheetScrollView
+      style={{ maxHeight: windowHeight / 2 }}
       contentContainerStyle={{ padding: 16, paddingBottom: bottomInset + 24 }}
     >
       <ScoresScreenContent onClose={onClose} />
@@ -38,8 +42,6 @@ export const useScoresScreen = () => {
       router.push("/(auth)/tv-scores-modal");
       return;
     }
-    showModal(<ScoresSheet onClose={hideModal} bottomInset={insets.bottom} />, {
-      snapPoints: ["50%"],
-    });
+    showModal(<ScoresSheet onClose={hideModal} bottomInset={insets.bottom} />);
   }, [showModal, hideModal, router, insets.bottom]);
 };

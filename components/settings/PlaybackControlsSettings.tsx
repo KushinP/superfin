@@ -3,13 +3,13 @@ import type React from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
-import { BITRATES } from "@/components/BitrateSelector";
 import { SettingSwitch } from "@/components/common/SettingSwitch";
 import { PlatformDropdown } from "@/components/PlatformDropdown";
 import { PLAYBACK_SPEEDS } from "@/components/PlaybackSpeedSelector";
 import DisabledSetting from "@/components/settings/DisabledSetting";
 import { LiveScoresSettings } from "@/components/settings/LiveScoresSettings";
 import { stillWatchingPresetLabel } from "@/components/settings/stillWatchingPresetLabel";
+import { BITRATES } from "@/constants/Playback";
 import { STILL_WATCHING_PRESET_ORDER } from "@/constants/StillWatching";
 import useRouter from "@/hooks/useAppRouter";
 import * as ScreenOrientation from "@/packages/expo-screen-orientation";
@@ -72,21 +72,6 @@ export const PlaybackControlsSettings: React.FC = () => {
       },
     ],
     [orientations, settings?.defaultVideoOrientation, t, updateSettings],
-  );
-
-  const bitrateOptions = useMemo(
-    () => [
-      {
-        options: BITRATES.map((bitrate) => ({
-          type: "radio" as const,
-          label: bitrate.key,
-          value: bitrate.key,
-          selected: bitrate.key === settings?.defaultBitrate?.key,
-          onPress: () => updateSettings({ defaultBitrate: bitrate }),
-        })),
-      },
-    ],
-    [settings?.defaultBitrate?.key, updateSettings],
   );
 
   const multiviewBitrate =
@@ -178,28 +163,6 @@ export const PlaybackControlsSettings: React.FC = () => {
             onValueChange={(value) =>
               updateSettings({ safeAreaInControlsEnabled: value })
             }
-          />
-        </ListItem>
-
-        <ListItem
-          title={t("home.settings.other.default_quality")}
-          disabled={pluginSettings?.defaultBitrate?.locked}
-        >
-          <PlatformDropdown
-            groups={bitrateOptions}
-            trigger={
-              <View className='flex flex-row items-center justify-between pl-3 py-1.5 '>
-                <Text className='mr-1 text-[#8E8D91]'>
-                  {settings.defaultBitrate?.key}
-                </Text>
-                <Ionicons
-                  name='chevron-expand-sharp'
-                  size={18}
-                  color='#5A5960'
-                />
-              </View>
-            }
-            title={t("home.settings.other.default_quality")}
           />
         </ListItem>
 

@@ -47,6 +47,7 @@ const HeroCarouselView: React.FC<HeroCarouselViewProps> = ({
   imageHeaders,
   filterSections,
   filterLabel,
+  maxFontScale,
   onItemPress,
   onFilterToggle,
   onActiveItemChange,
@@ -59,8 +60,9 @@ const HeroCarouselView: React.FC<HeroCarouselViewProps> = ({
         imageHeaders: imageHeaders ?? {},
         filterSections: filterSections ?? [],
         filterLabel: filterLabel ?? "",
+        maxFontScale: maxFontScale ?? null,
       }),
-    [items, imageHeaders, filterSections, filterLabel],
+    [items, imageHeaders, filterSections, filterLabel, maxFontScale],
   );
   if (!NativeHeroCarouselView) {
     return null;

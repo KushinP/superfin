@@ -1,6 +1,7 @@
 // Type only: the selector module loads its dropdown, native code and all.
 import type { Bitrate } from "@/components/BitrateSelector";
 import type { Settings } from "@/utils/atoms/settings";
+import { isAutoBitrate } from "@/utils/bitrate";
 
 /**
  * A tile's cap until the user picks one. Live channels arrive at the
@@ -21,6 +22,12 @@ export const DEFAULT_MULTIVIEW_BITRATE: Bitrate = {
 export const tileMaxBitrate = (
   settings: Partial<Pick<Settings, "multiviewMaxBitrate" | "defaultBitrate">>,
   tileQuality?: Bitrate,
-): number | undefined =>
-  (tileQuality ?? settings.multiviewMaxBitrate ?? DEFAULT_MULTIVIEW_BITRATE)
-    .value;
+): number | undefined => {
+  // Auto measures the link for one player, and the tiles share it: an Auto
+  // here (from a plugin, or an old setting) is the tile cap instead. Max has
+  // no value either, and means no cap.
+  const quality = [tileQuality, settings.multiviewMaxBitrate].find(
+    (candidate) => candidate && !isAutoBitrate(candidate),
+  );
+  return (quality ?? DEFAULT_MULTIVIEW_BITRATE).value;
+};

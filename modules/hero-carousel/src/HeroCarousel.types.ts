@@ -63,6 +63,11 @@ export type HeroCarouselViewProps = {
   filterSections?: HeroCarouselFilterSection[];
   /** Pre-localized accessibility label for the filter button. */
   filterLabel?: string;
+  /**
+   * Largest font scale the cards follow; null or omitted, they follow the
+   * system's. The filter menu always keeps the system's.
+   */
+  maxFontScale?: number | null;
   onItemPress?: (event: { nativeEvent: HeroCarouselItemPressEvent }) => void;
   /**
    * Fires with the id of the slide now showing: on first layout, and each

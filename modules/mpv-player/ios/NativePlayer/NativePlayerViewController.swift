@@ -350,42 +350,6 @@ final class NativePlayerViewController: UIViewController {
 		#endif
 	}
 
-	#if os(iOS)
-	// MARK: Hardware keyboard (iPad and the Mac)
-
-	override var canBecomeFirstResponder: Bool { true }
-
-	override var keyCommands: [UIKeyCommand]? {
-		// The subtitle search has a text field; plain keys belong to it.
-		guard !viewModel.showSubtitleSearch else { return nil }
-		return PlayerKeyBindings.all.map { binding in
-			let command = UIKeyCommand(
-				title: binding.title,
-				action: #selector(handleKeyCommand(_:)),
-				input: binding.input,
-				modifierFlags: []
-			)
-			// Space and the arrows would otherwise scroll or move focus.
-			command.wantsPriorityOverSystemBehavior = true
-			return command
-		}
-	}
-
-	@objc private func handleKeyCommand(_ command: UIKeyCommand) {
-		guard let input = command.input, let action = PlayerKeyBindings.action(for: input)
-		else { return }
-		let volume = viewModel.volumeController
-		switch action {
-		case .playPause: viewModel.togglePlayPause()
-		case .seekBackward: viewModel.keyboardSeek(forward: false)
-		case .seekForward: viewModel.keyboardSeek(forward: true)
-		case .volumeUp: volume.setVolume(PlayerKeyBindings.stepped(volume: volume.volume, up: true))
-		case .volumeDown: volume.setVolume(PlayerKeyBindings.stepped(volume: volume.volume, up: false))
-		case .toggleMute: viewModel.toggleMute()
-		case .close: viewModel.close()
-		}
-	}
-	#endif
 
 	override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
@@ -393,10 +357,8 @@ final class NativePlayerViewController: UIViewController {
 		engine.setPictureInPictureHostVisible(true)
 		UIApplication.shared.isIdleTimerDisabled = viewModel.isPlaying
 		#if os(iOS)
-		UIApplication.shared.setStatusBarHidden(!viewModel.controlsVisible, with: .none)
-		// Puts the player's keyboard shortcuts in the responder chain: in a
-		// presented player nothing else is first responder.
 		becomeFirstResponder()
+		UIApplication.shared.setStatusBarHidden(!viewModel.controlsVisible, with: .none)
 		#endif
 		#if os(tvOS)
 		// The initial zone activation ran at viewDidLoad time, before the
@@ -405,6 +367,159 @@ final class NativePlayerViewController: UIViewController {
 		focusCoordinator.refresh()
 		#endif
 	}
+
+	#if os(iOS)
+	// MARK: - Hardware keyboard
+
+	// Key commands and key presses only reach this controller while it is in
+	// the responder chain, so it claims first responder once on screen.
+	override var canBecomeFirstResponder: Bool { true }
+
+	/// The presses pressesBegan kept. UIKit sends the later phases of a press
+	/// to the responder that got it, and one that keeps a press from super has
+	/// to keep its end and cancel too.
+	private var handledPresses = Set<UIPress>()
+
+	override var keyCommands: [UIKeyCommand]? {
+		// The arrows are key commands, which repeat, so a held arrow keeps
+		// seeking. The space bar is a press: a held one toggles once. A command
+		// with priority swallows the arrow before the focus system sees it, so the
+		// commands are only there while nothing else on screen wants the arrows.
+		var commands: [UIKeyCommand] = []
+		if PlayerKeyboardPolicy.registersArrowCommands(in: keyboardState) {
+			commands += [
+				UIKeyCommand(input: UIKeyCommand.inputLeftArrow, modifierFlags: [], action: #selector(handleLeftArrowCommand)),
+				UIKeyCommand(input: UIKeyCommand.inputRightArrow, modifierFlags: [], action: #selector(handleRightArrowCommand)),
+			]
+		}
+		// SuperFin: ↑ ↓ volume, M mute and Esc close (PlayerKeyBindings), titled
+		// for the ⌘ overlay and the Mac's menu bar. Not while a prompt, a sheet
+		// or the lock owns the keys, as it owns space and the arrows.
+		if !keyboardState.overlayOwnsInput {
+			commands += PlayerKeyBindings.all.map { binding in
+				UIKeyCommand(
+					title: binding.title,
+					action: #selector(handleShortcutCommand(_:)),
+					input: binding.input,
+					modifierFlags: []
+				)
+			}
+		}
+		for command in commands {
+			command.wantsPriorityOverSystemBehavior = true
+			// The physical key, as the press path reads it: a mirrored command
+			// would swap the arrows in a right-to-left interface.
+			command.allowsAutomaticMirroring = false
+		}
+		return commands
+	}
+
+	@objc private func handleShortcutCommand(_ command: UIKeyCommand) {
+		guard let input = command.input, let action = PlayerKeyBindings.action(for: input)
+		else { return }
+		let volume = viewModel.volumeController
+		switch action {
+		case .volumeUp: volume.setVolume(PlayerKeyBindings.stepped(volume: volume.volume, up: true))
+		case .volumeDown: volume.setVolume(PlayerKeyBindings.stepped(volume: volume.volume, up: false))
+		case .toggleMute: viewModel.toggleMute()
+		case .close: viewModel.close()
+		}
+	}
+
+	override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		var forwarded = Set<UIPress>()
+		for press in presses {
+			if let action = pressAction(for: press) {
+				handledPresses.insert(press)
+				perform(action)
+			} else {
+				forwarded.insert(press)
+			}
+		}
+		// Anything not ours goes up the chain, space included while an overlay
+		// is up, so it can still activate the focused button there.
+		if !forwarded.isEmpty { super.pressesBegan(forwarded, with: event) }
+	}
+
+	override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		let forwarded = presses.subtracting(handledPresses)
+		if !forwarded.isEmpty { super.pressesChanged(forwarded, with: event) }
+	}
+
+	override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		let forwarded = releaseHandledPresses(presses)
+		if !forwarded.isEmpty { super.pressesEnded(forwarded, with: event) }
+	}
+
+	override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+		let forwarded = releaseHandledPresses(presses)
+		if !forwarded.isEmpty { super.pressesCancelled(forwarded, with: event) }
+	}
+
+	/// Forgets the handled presses among these, which are over, and returns
+	/// the others for super.
+	private func releaseHandledPresses(_ presses: Set<UIPress>) -> Set<UIPress> {
+		let forwarded = presses.subtracting(handledPresses)
+		handledPresses.subtract(presses)
+		return forwarded
+	}
+
+	/// The prompts, the sheets, the error overlay and the lock mode own the
+	/// input, same as the touch controls. Without the sheets here, the arrows
+	/// seek while the search sheet is up.
+	private var keyboardState: PlayerKeyboardState {
+		PlayerKeyboardState(
+			overlayOwnsInput: viewModel.showStillWatching || viewModel.showEpisodeList
+				|| viewModel.showSubtitleSearch || viewModel.showSyncPlayQueue
+				|| viewModel.controlsLocked || viewModel.errorMessage != nil,
+			subtitleScaleShown: viewModel.showSubtitleScaleControl,
+			isScrubbing: viewModel.isScrubbing,
+			canSeek: viewModel.isReadyToSeek && viewModel.duration > 0,
+			syncPlayActive: viewModel.isSyncPlayActive
+		)
+	}
+
+	private func pressAction(for press: UIPress) -> PlayerKeyAction? {
+		guard let key = press.key else { return nil }
+		let playerKey: PlayerKey
+		switch key.keyCode {
+		case .keyboardSpacebar: playerKey = .space
+		case .keyboardLeftArrow: playerKey = .leftArrow
+		case .keyboardRightArrow: playerKey = .rightArrow
+		default: return nil
+		}
+		// Not .numericPad: most keyboards report it on the arrows.
+		let modified = !key.modifierFlags.isDisjoint(with: [.shift, .control, .alternate, .command])
+		return PlayerKeyboardPolicy.pressAction(for: playerKey, modified: modified, in: keyboardState)
+	}
+
+	@objc private func handleLeftArrowCommand() {
+		if let action = PlayerKeyboardPolicy.commandAction(for: .leftArrow, in: keyboardState) {
+			perform(action)
+		}
+	}
+
+	@objc private func handleRightArrowCommand() {
+		if let action = PlayerKeyboardPolicy.commandAction(for: .rightArrow, in: keyboardState) {
+			perform(action)
+		}
+	}
+
+	private func perform(_ action: PlayerKeyAction) {
+		// As a touch does: a key shows hidden controls, and only keeps shown
+		// ones up, so each repeat of a held arrow does not show them again.
+		if viewModel.controlsVisible {
+			viewModel.scheduleAutoHide()
+		} else {
+			viewModel.showControls()
+		}
+		switch action {
+		case .togglePlayPause: viewModel.togglePlayPause()
+		case .seekBackward: viewModel.seekBackward()
+		case .seekForward: viewModel.seekForward()
+		}
+	}
+	#endif
 
 	override func viewWillDisappear(_ animated: Bool) {
 		super.viewWillDisappear(animated)
