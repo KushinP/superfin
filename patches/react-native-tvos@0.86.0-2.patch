@@ -1,0 +1,19 @@
+diff --git a/Libraries/Pressability/Pressability.js b/Libraries/Pressability/Pressability.js
+index cd8629fe697ec3de793cded647f93c2f6993cfc0..1178541f32b22891dc6fc47a0996c7c49f71d9b6 100644
+--- a/Libraries/Pressability/Pressability.js
++++ b/Libraries/Pressability/Pressability.js
+@@ -479,7 +479,13 @@ export default class Pressability {
+           const isPressCanceledByLongPress =
+             onLongPress != null && this._longPressSent;
+           if (!isPressCanceledByLongPress) {
+-            if (Platform.OS === 'android' && android_disableSound !== true) {
++            // SuperFin: Android already clicks when OK releases a focusable
++            // view (its click listener), so a second click here doubled it.
++            if (
++              Platform.OS === 'android' &&
++              !Platform.isTV &&
++              android_disableSound !== true
++            ) {
+               SoundManager.playTouchSound();
+             }
+             onPress(evt);
