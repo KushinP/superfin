@@ -10,8 +10,10 @@ interface Props extends ActivityIndicatorProps {}
 export const Loader: React.FC<Props> = ({ ...props }) => {
   return (
     <ActivityIndicator
-      size={"small"}
-      color={Platform.OS === "ios" ? "white" : Colors.primary}
+      // No accent on TV (docs/conventions/tv.md), and a spinner that reads
+      // from across the room.
+      size={Platform.isTV ? "large" : "small"}
+      color={Platform.isTV || Platform.OS === "ios" ? "white" : Colors.primary}
       {...props}
     />
   );

@@ -59,6 +59,7 @@ import { useOfflineMode } from "@/providers/OfflineModeProvider";
 import { useSettings } from "@/utils/atoms/settings";
 import type { TVOptionItem } from "@/utils/atoms/tvOptionModal";
 import { resolveStartTicks } from "@/utils/directPlayer/sessionPosition";
+import { episodeSubtitle } from "@/utils/episodeLabel";
 import {
   getAdjacentStartTicks,
   getDefaultPlaySettings,
@@ -1523,7 +1524,9 @@ export const Controls: FC<Props> = ({
             {item?.Type === "Episode" && (
               <Text
                 style={[styles.subtitleText, { fontSize: typography.body }]}
-              >{`${item.SeriesName} - ${item.SeasonName} Episode ${item.IndexNumber}`}</Text>
+              >
+                {episodeSubtitle(t, item)}
+              </Text>
             )}
             <View style={styles.titleRow}>
               <Text

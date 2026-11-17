@@ -19,6 +19,7 @@ import { TVLiveScoresSettings } from "@/components/settings/TVLiveScoresSettings
 import { TVSeerrSettings } from "@/components/settings/TVSeerrSettings";
 import type { TVOptionItem } from "@/components/tv";
 import {
+  TVBelowTabBar,
   TVCustomHeadersSection,
   TVLogoutButton,
   TVSectionHeader,
@@ -27,6 +28,7 @@ import {
   TVSettingsStepper,
   TVSettingsTextInput,
   TVSettingsToggle,
+  useTVBelowTabBarContentTop,
 } from "@/components/tv";
 import { PERMISSION_ASKED_KEY } from "@/constants/Notifications";
 import {
@@ -93,6 +95,8 @@ const SEGMENT_SKIP_ROWS: {
 export default function SettingsTV() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  // The title rests where it did, whether or not the area starts below a tab bar.
+  const contentTop = useTVBelowTabBarContentTop(120);
   const { settings, updateSettings, pluginSettings } = useSettings();
   const { available: syncPlayAvailable } = useSyncPlay();
   const { logout, loginWithSavedCredential, loginWithPassword } = useJellyfin();
@@ -827,11 +831,11 @@ export default function SettingsTV() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000000" }}>
-      <View style={{ flex: 1 }}>
+      <TVBelowTabBar>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingTop: insets.top + 120,
+            paddingTop: contentTop,
             paddingBottom: insets.bottom + 60,
             paddingHorizontal: insets.left + 80,
           }}
@@ -1561,7 +1565,7 @@ export default function SettingsTV() {
             <TVLogoutButton onPress={logout} />
           </View>
         </ScrollView>
-      </View>
+      </TVBelowTabBar>
 
       {/* PIN Entry Modal */}
       <TVPINEntryModal
