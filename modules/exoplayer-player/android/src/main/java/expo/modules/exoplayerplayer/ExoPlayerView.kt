@@ -1330,6 +1330,13 @@ class ExoPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         surface.layoutParams = FrameLayout.LayoutParams(surfaceWidth, surfaceHeight).apply {
             gravity = Gravity.CENTER
         }
+        // React Native doesn't lay out a native view's children when they ask
+        // (react-native#17968), so the new size was never applied: the surface
+        // stayed full screen and a 2.4:1 film was stretched to 16:9 (Fire TV,
+        // 2026-11-16, SurfaceFlinger showed 1920x1080 for a 1920x800 stream).
+        // Lay this view out once, here, rather than on every requestLayout
+        // (shouldUseAndroidLayout), which queued passes for dropped views.
+        post { if (isAttachedToWindow) measureAndLayout() }
     }
 
     fun setZoomedToFill(zoomed: Boolean) {

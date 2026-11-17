@@ -85,3 +85,59 @@ describe("TV search studios", () => {
     expect(onItemLongPress).toHaveBeenCalledWith(actor);
   });
 });
+
+// Fire TV, 2026-11-16, with ADB: the search box took the focus as a bare text
+// field in typing mode, and ↓ and → stayed in it, so Library / Discover and
+// the rows below couldn't be reached; only Back got out. On Android TV it is
+// now the login screen's field: a focusable box that types only once it's
+// pressed, which the D-pad can leave.
+describe("TV search box on Android TV", () => {
+  const { Platform } = jest.requireActual("react-native");
+  const wasOS = Platform.OS;
+  beforeEach(() => {
+    Object.defineProperty(Platform, "OS", {
+      value: "android",
+      configurable: true,
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(Platform, "OS", { value: wasOS, configurable: true });
+  });
+
+  test("the text field isn't focusable on its own: its box takes the focus", async () => {
+    await renderPage({});
+    const field = screen.getByPlaceholderText("search.search");
+
+    expect(field.props.focusable).not.toBe(true);
+    let node = field.parent;
+    let boxFocusable = false;
+    while (node) {
+      if (node.props?.focusable === true) boxFocusable = true;
+      node = node.parent;
+    }
+    expect(boxFocusable).toBe(true);
+  });
+
+  test("typing still searches", async () => {
+    const setSearch = jest.fn();
+    await render(
+      <TVSearchPage
+        search=''
+        setSearch={setSearch}
+        debouncedSearch=''
+        loading={false}
+        noResults={false}
+        onItemPress={jest.fn()}
+        onItemLongPress={jest.fn()}
+        searchType='Library'
+        setSearchType={() => {}}
+        showDiscover={false}
+      />,
+    );
+    await fireEvent.changeText(
+      screen.getByPlaceholderText("search.search"),
+      "pix",
+    );
+    expect(setSearch).toHaveBeenCalledWith("pix");
+  });
+});
