@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   FlatList,
+  TVFocusGuideView,
   View,
   type ViewProps,
 } from "react-native";
@@ -334,74 +335,81 @@ const InfiniteScrollingCollectionListComponent: React.FC<Props> = ({
           ))}
         </View>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          horizontal
-          data={allItems}
-          keyExtractor={(item) => item.Id!}
-          renderItem={renderItem}
-          showsHorizontalScrollIndicator={false}
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.5}
-          initialNumToRender={4}
-          maxToRenderPerBatch={2}
-          windowSize={3}
-          removeClippedSubviews={false}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          style={{ overflow: "visible" }}
-          contentContainerStyle={{
-            paddingVertical: sizes.gaps.small,
-            paddingLeft: sizes.padding.horizontal,
-            paddingRight: sizes.padding.horizontal,
-          }}
-          // Below is a work around with the contentInset, same in TVHeroCarousel, if okay on apple remove
-          // ListHeaderComponent={
-          //   <View style={{ width: sizes.padding.horizontal }} />
-          // }
-          // contentInset={{
-          //   left: sizes.padding.horizontal,
-          //   right: sizes.padding.horizontal,
-          // }}
-          // contentOffset={{ x: -sizes.padding.horizontal, y: 0 }}
-          // contentContainerStyle={{ paddingVertical: SCALE_PADDING }}
-          ListFooterComponent={
-            // No fixed width: the footer must size to the "See All" card so the
-            // FlatList's scrollable content extends to fully reveal it. A fixed
-            // (narrow) width clipped the card at the right edge. Trailing space is
-            // provided by contentContainerStyle.paddingRight.
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              {isFetchingNextPage && (
-                <View
-                  style={{
-                    marginLeft: itemWidth / 2,
-                    marginRight: ITEM_GAP,
-                    justifyContent: "center",
-                    height:
-                      orientation === "horizontal"
-                        ? scaleSize(191)
-                        : scaleSize(315),
-                  }}
-                >
-                  <ActivityIndicator size='small' color='white' />
-                </View>
-              )}
-              {parentId && allItems.length > 0 && (
-                <TVSeeAllCard
-                  onPress={handleSeeAllPress}
-                  orientation={orientation}
-                  disabled={disabled}
-                  typography={typography}
-                  posterSizes={posterSizes}
-                />
-              )}
-            </View>
-          }
-        />
+        // The row is one focus target for ↑ and ↓: Android picked the next
+        // card by position alone, and with rows scrolled sideways by
+        // different amounts ↑ from "Suggested movies" skipped a whole row
+        // (Fire TV, 2026-11-16, screenshots). Entering, the guide hands the
+        // focus to the card last used here, or the first.
+        <TVFocusGuideView testID='tv-row-focus-guide' autoFocus>
+          <FlatList
+            ref={flatListRef}
+            horizontal
+            data={allItems}
+            keyExtractor={(item) => item.Id!}
+            renderItem={renderItem}
+            showsHorizontalScrollIndicator={false}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+            initialNumToRender={4}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            removeClippedSubviews={false}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            style={{ overflow: "visible" }}
+            contentContainerStyle={{
+              paddingVertical: sizes.gaps.small,
+              paddingLeft: sizes.padding.horizontal,
+              paddingRight: sizes.padding.horizontal,
+            }}
+            // Below is a work around with the contentInset, same in TVHeroCarousel, if okay on apple remove
+            // ListHeaderComponent={
+            //   <View style={{ width: sizes.padding.horizontal }} />
+            // }
+            // contentInset={{
+            //   left: sizes.padding.horizontal,
+            //   right: sizes.padding.horizontal,
+            // }}
+            // contentOffset={{ x: -sizes.padding.horizontal, y: 0 }}
+            // contentContainerStyle={{ paddingVertical: SCALE_PADDING }}
+            ListFooterComponent={
+              // No fixed width: the footer must size to the "See All" card so the
+              // FlatList's scrollable content extends to fully reveal it. A fixed
+              // (narrow) width clipped the card at the right edge. Trailing space is
+              // provided by contentContainerStyle.paddingRight.
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {isFetchingNextPage && (
+                  <View
+                    style={{
+                      marginLeft: itemWidth / 2,
+                      marginRight: ITEM_GAP,
+                      justifyContent: "center",
+                      height:
+                        orientation === "horizontal"
+                          ? scaleSize(191)
+                          : scaleSize(315),
+                    }}
+                  >
+                    <ActivityIndicator size='small' color='white' />
+                  </View>
+                )}
+                {parentId && allItems.length > 0 && (
+                  <TVSeeAllCard
+                    onPress={handleSeeAllPress}
+                    orientation={orientation}
+                    disabled={disabled}
+                    typography={typography}
+                    posterSizes={posterSizes}
+                  />
+                )}
+              </View>
+            }
+          />
+        </TVFocusGuideView>
       )}
     </View>
   );
