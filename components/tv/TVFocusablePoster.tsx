@@ -3,7 +3,7 @@ import {
   Animated,
   Easing,
   Pressable,
-  View,
+  type ViewInstance,
   type ViewStyle,
 } from "react-native";
 import { Colors } from "@/constants/Colors";
@@ -22,7 +22,7 @@ export interface TVFocusablePosterProps {
   /** When true, the item remains focusable even when disabled (for navigation purposes) */
   focusableWhenDisabled?: boolean;
   /** Setter function for the ref (for focus guide destinations) */
-  refSetter?: (ref: View | null) => void;
+  refSetter?: (ref: ViewInstance | null) => void;
 }
 
 export const TVFocusablePoster: React.FC<TVFocusablePosterProps> = ({

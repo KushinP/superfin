@@ -55,13 +55,12 @@ Navigation:
 - `introsheet-rendering-location` | IntroSheet in IntroSheetProvider affects native bottom tabs via nav state hooks
 - `intro-modal-trigger-location` | Trigger in Home.tsx, not tabs _layout.tsx
 - `expo-router-top-tabs-runtime-peers` | js-top-tabs requires react-native-tab-view (+ pager-view) at runtime; no import shows it, removing them crashes on launch
-- `ios27-sdk-tab-bar-items-display-order` | linked against the iOS 27 SDK, UITabBar.items is in display order (search last) and the detached button is TabRole.prominent; patched in react-native-bottom-tabs
-- `swiftui-foreach-evicts-hidden-tabs` | SwiftUI evicts a ForEach element no tab retains, and a tvOS focus selection past it rebuilds it outside an update and traps (REACT-NATIVE-24); hidden tabs stay out of the ForEach, patched in react-native-bottom-tabs
 - `sidebar-adaptable-breaks-in-a-mac-window` | Apple's sidebar-adaptable tab view skips its layout after the toggle in a Mac window; the Mac draws MacSidebar and hides the tab bar, the iPad keeps the native one
+- `shared-route-from-outside-tabs-lands-in-first-group` | a shared route pushed from outside the tabs opens in the alphabetically first tab group; keep `(home)` first
 - `foreign-link-lands-on-library-route` | the library route is /[libraryId], so an unknown one-word link opens it with that word as the id; the music notification's trackplayer://notification.click did, and app/+native-intent.ts drops it
 
 UI and headers:
-- `macos-header-buttons-fix` | macOS Catalyst: use RNGH Pressable, not RN TouchableOpacity
+- `macos-header-buttons-fix` | macOS Catalyst: use RNGH LegacyPressable, not RN TouchableOpacity or the new RNGH Pressable
 - `header-button-locations` | Defined in _layout.tsx, HeaderBackButton, Chromecast, RoundButton, etc.
 - `stack-screen-header-configuration` | Sub-pages need explicit Stack.Screen with headerTransparent + back button
 - `switch-pointerevents-ignored` | Switch ignores its own pointerEvents (Android); wrap in a View pointerEvents="none"
@@ -89,8 +88,9 @@ Native modules:
 - `sentry-native-options-fail-silently` | sentry-cocoa ignores an option key it does not know, with no error; check the spelling in Options+Dictionary.swift
 - `avaudiosession-calls-block-on-the-audio-server` | every AVAudioSession setter AND getter is a synchronous XPC call that can take seconds; never on main, session changes go through PlayerAudioSession
 - `foreground-service-start-must-be-answered` | every startForegroundService() needs startForeground() first in onStartCommand, unconditionally; a refused call still answers it, a skipped one kills the process
-- `keychain-accessibility-set-at-creation` | a SecureStore item keeps the accessibility it was created with, `setItem` over it changes only the data; a default item throws on read when iOS launches the app on a locked phone
+- `keychain-accessibility-set-at-creation` | before SDK 58 a SecureStore item kept the accessibility it was created with, `setItem` over it changed only the data; a default item throws on read when iOS launches the app on a locked phone
 - `track-player-queue-is-not-the-app-queue` | the native music queue only holds the tracks loaded so far, so a state queue index does not address it; on iOS `add` past the end rejects with the same message as `skip`
+- `drax-drop-needs-patch-in-release` | drax 1.1.0 on Gesture Handler 3 springs a dropped row back in release builds only; `patches/react-native-drax@1.1.0.patch` fixes it, keep it until a release passes its spec
 - `android-js-timers-pause-in-background` | Delayed timers don't fire while the Android app is paused (incl. under the Cast expanded controls); zero-delay ones and fetch still do
 - `android-mpv-one-player-per-process` | MpvOwnership.kt lets one MPV renderer play per Android process, so Android TV multiview tiles use ExoPlayer (multiviewEngine) and Android phones have none
 - `exoplayer-tiles-need-pcm-and-no-audio-focus` | several ExoPlayers at once: each takes audio focus and pauses the others, and passthrough ignores volume; tiles pass multiview: true (no focus, PCM-only sink)
@@ -116,6 +116,7 @@ Build and tooling:
 - `develop-merge-cancels-tv-build` | build-apps cancels develop's running build on each merge; install a PR branch's artifact, or merge everything first and wait for one build
 - `require-hooks-leak-across-jest-specs` | a require hook (tsx/cjs) registered from a spec stays on the Jest worker's Node loader and breaks later specs; map it to a stub
 - `expo-image-prebuilt-glide-logs` | Expo's prebuilt expo-image AAR ships with Glide logs on, every image URL (trickplay ApiKey included) reaches logcat; built from source instead
+- `repack-shrunk-resources-missing-attrs` | AGP 9's R8 resource shrinking leaves XML naming attributes it removed; apktool cannot relink them, so the Android repack declares them and builds again
 
 ## Project overview
 
@@ -170,7 +171,7 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
 ## Stack
 
 - **Runtime and package manager**: Bun
-- **Framework**: Expo SDK 57, React 19, `react-native-tvos`
+- **Framework**: Expo SDK 58, React 19, `react-native-tvos`
 - **Language**: TypeScript, strict mode
 - **State**: Jotai for global state, React Query for server state
 - **API**: Jellyfin SDK 1.0 (`@jellyfin/sdk`)
@@ -196,7 +197,7 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
 | `plugins/` | Expo config plugins |
 | `patches/` | Patch package overrides |
 | `augmentations/` | Type augmentations |
-| `test-utils/` | Shared test doubles: Jellyfin API, MMKV, the file system, custom headers, React Native, Reanimated |
+| `test-utils/` | Shared test doubles: Jellyfin API, MMKV, the file system, custom headers, React Native, Reanimated, @expo/ui, drax |
 | `tests/native/` | Standalone native checks (subtitle geometry, app container paths), each run by its script in `scripts/ios/`, and subtitle playback fixtures |
 | `translations/` | i18n catalogues, `en.json` is the only source |
 | `scripts/` | Repo tooling run through bun |
@@ -235,10 +236,17 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
 
 **Navigation**
 - File based routing under `app/`.
-- Tab groups: `(home)`, `(search)`, `(favorites)`, `(livetv)`, `(libraries)`,
-  `(watchlists)`, `(custom-links)`, `(settings)`. `(livetv)` shows only when the user
-  has a Live TV library (`useLiveTvAvailable`). Routes shared by several tabs live in
-  the combined group `(home,libraries,search,favorites,watchlists,livetv)`.
+- Tab groups: `(home)`, `(search)`, `(livetv)`, `(libraries)`, `(more)`, `(tv-favorites)`,
+  `(tv-watchlists)`, `(tv-settings)`. The phone bar shows Home, Search, Live TV, Library
+  and More, a menu for what it has no room for: favorites, watchlists, custom links,
+  sessions and settings. Downloads stay a button in Home's header. The TV bar has room
+  for every section, so favorites, watchlists and settings stay tabs there, in the
+  `(tv-*)` groups, and More is hidden (`utils/tvTabs.ts`). `(livetv)` shows only when
+  the user has a Live TV library (`useLiveTvAvailable`), on the phone and the TV. The
+  Mac hides the tab bar and draws `MacSidebar` in its place. Routes shared by several
+  tabs live in the combined group
+  `(home,libraries,search,more,tv-favorites,tv-watchlists,livetv)`. No tab group may
+  sort before `(home)`, see `shared-route-from-outside-tabs-lands-in-first-group`.
 - **IMPORTANT**: use `useAppRouter` from `@/hooks/useAppRouter`, never `useRouter` or the
   static `router` from `expo-router`. The wrapper preserves offline mode across
   navigation.

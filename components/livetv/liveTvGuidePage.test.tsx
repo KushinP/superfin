@@ -1,4 +1,4 @@
-// Spec for app/(auth)/(tabs)/(home,libraries,search,favorites,watchlists,livetv)/livetv/guide.tsx.
+// Spec for app/(auth)/(tabs)/(home,libraries,search,more,tv-favorites,tv-watchlists,livetv)/livetv/guide.tsx.
 // It lives here rather than next to the page because Expo Router turns every
 // file under app/ into a route.
 import type { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
@@ -15,7 +15,7 @@ import {
   waitFor,
 } from "@testing-library/react-native";
 import { createStore, Provider as JotaiProvider } from "jotai";
-import LiveTvGuidePage from "@/app/(auth)/(tabs)/(home,libraries,search,favorites,watchlists,livetv)/livetv/guide";
+import LiveTvGuidePage from "@/app/(auth)/(tabs)/(home,libraries,search,more,tv-favorites,tv-watchlists,livetv)/livetv/guide";
 import { apiAtom } from "@/providers/JellyfinProvider";
 import { makeApi } from "@/test-utils/jellyfinApi";
 

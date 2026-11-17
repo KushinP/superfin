@@ -19,6 +19,7 @@ import {
   Pressable,
   useWindowDimensions,
   View,
+  type ViewInstance,
 } from "react-native";
 import { SystemBars } from "react-native-edge-to-edge";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -173,9 +174,9 @@ function MultiviewScreen() {
   // focused (see the android-tv-modal-close-loses-focus fact), so the
   // toolbar button that opened it takes the focus back once this screen is
   // on top again.
-  const qualityButton = useRef<View>(null);
-  const scoresButton = useRef<View>(null);
-  const toolbarReturn = useRef<RefObject<View | null> | null>(null);
+  const qualityButton = useRef<ViewInstance>(null);
+  const scoresButton = useRef<ViewInstance>(null);
+  const toolbarReturn = useRef<RefObject<ViewInstance | null> | null>(null);
   // Likewise a tile's TV menu: the tile it was opened from takes the focus
   // back, or the main tile when that one was removed.
   const { showOptions } = useTVOptionModal();
@@ -624,7 +625,7 @@ function ToolbarButton({
   /** This button's view, for the tiles' Up to reach. */
   onHandle?: (handle: number | null) => void;
   /** This button's view, for the screen to give the focus back to. */
-  buttonRef?: RefObject<View | null>;
+  buttonRef?: RefObject<ViewInstance | null>;
   nextFocusDown?: number;
 }) {
   const { focused, onFocus, onBlur } = useFocused(onFocusChange);
@@ -634,7 +635,7 @@ function ToolbarButton({
     <Pressable
       ref={(view) => {
         if (buttonRef) buttonRef.current = view;
-        onHandle?.(view ? findNodeHandle(view) : null);
+        onHandle?.(view ? (findNodeHandle(view) ?? null) : null);
       }}
       nextFocusDown={nextFocusDown}
       onPress={onPress}

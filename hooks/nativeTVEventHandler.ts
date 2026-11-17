@@ -1,7 +1,7 @@
-import type { HWEvent } from "react-native";
 import { Platform } from "react-native";
+import type { TVRemoteKeyEvent } from "@/hooks/useTVEventHandler";
 
-type UseTVEventHandler = (callback: (evt: HWEvent) => void) => void;
+type UseTVEventHandler = (callback: (evt: TVRemoteKeyEvent) => void) => void;
 
 let tvEventHandler: UseTVEventHandler = () => {};
 

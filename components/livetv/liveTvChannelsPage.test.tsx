@@ -1,4 +1,4 @@
-// Spec for app/(auth)/(tabs)/(home,libraries,search,favorites,watchlists,livetv)/livetv/channels.tsx.
+// Spec for app/(auth)/(tabs)/(home,libraries,search,more,tv-favorites,tv-watchlists,livetv)/livetv/channels.tsx.
 // It lives here rather than next to the page because Expo Router turns every
 // file under app/ into a route.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import {
   waitFor,
 } from "@testing-library/react-native";
 import { createStore, Provider as JotaiProvider } from "jotai";
-import LiveTvChannelsPage from "@/app/(auth)/(tabs)/(home,libraries,search,favorites,watchlists,livetv)/livetv/channels";
+import LiveTvChannelsPage from "@/app/(auth)/(tabs)/(home,libraries,search,more,tv-favorites,tv-watchlists,livetv)/livetv/channels";
 import { apiAtom } from "@/providers/JellyfinProvider";
 import { makeApi } from "@/test-utils/jellyfinApi";
 

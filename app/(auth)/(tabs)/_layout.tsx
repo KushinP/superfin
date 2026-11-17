@@ -1,20 +1,12 @@
-import {
-  createNativeBottomTabNavigator,
-  type NativeBottomTabNavigationEventMap,
-  type NativeBottomTabNavigationOptions,
-} from "@bottom-tabs/react-navigation";
-import { Stack, useSegments, withLayoutContext } from "expo-router";
-import type {
-  ParamListBase,
-  TabNavigationState,
-} from "expo-router/react-navigation";
+import { Redirect, Stack, useSegments } from "expo-router";
+import { NativeTabs } from "expo-router/native-tabs";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
 import { SystemBars } from "react-native-edge-to-edge";
 import { AppKeyCommands } from "@/components/AppKeyCommands";
-import { MacSidebar } from "@/components/MacSidebar";
 import { MacWindowSize } from "@/components/MacWindowSize";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import type { TVNavBarTab } from "@/components/tv/TVNavBar";
 import { TVNavBar } from "@/components/tv/TVNavBar";
 import { Colors } from "@/constants/Colors";
@@ -30,6 +22,12 @@ import {
 import { useSettings } from "@/utils/atoms/settings";
 import { eventBus } from "@/utils/eventBus";
 import { isMac, usesNativeSidebar } from "@/utils/platform";
+import {
+  isTVTabGone,
+  showsWatchlists,
+  type TVTabGroup,
+  tvTabGroups,
+} from "@/utils/tvTabs";
 
 // Music components are not available on tvOS (TrackPlayer not supported)
 const MiniPlayerBar = Platform.isTV
@@ -39,64 +37,58 @@ const MusicPlaybackEngine = Platform.isTV
   ? () => null
   : require("@/components/music/MusicPlaybackEngine").MusicPlaybackEngine;
 
-// Catches render crashes inside the tab navigator before they bubble to the
-// root boundary. The fallback replaces the whole navigator (tab bar
-// included) and retry remounts it fresh, discarding navigation state — but
-// the session, providers, and root layout survive.
-export { RouteErrorBoundary as ErrorBoundary } from "@/components/RouteErrorBoundary";
+// The Mac's own sidebar (see MacSidebar), loaded only there: it pulls in the
+// item and library code the phone and TV start-up do not need.
+function MacSidebar() {
+  const { MacSidebar: Sidebar } = require("@/components/MacSidebar");
+  return <Sidebar />;
+}
 
-const { Navigator } = createNativeBottomTabNavigator();
+// Catches a crash in this layout or a nested one before it reaches the root
+// boundary. The fallback replaces the whole navigator, tab bar included, and
+// retry remounts it fresh; the session, providers and root layout survive.
+export { RouteErrorBoundary as ErrorBoundary };
 
-export const NativeTabs = withLayoutContext<
-  NativeBottomTabNavigationOptions,
-  typeof Navigator,
-  TabNavigationState<ParamListBase>,
-  NativeBottomTabNavigationEventMap
->(Navigator);
+export const unstable_settings = {
+  // Both navigators below open on (home); Expo Router 58 reads the initial
+  // route from the layout's anchor rather than an initialRouteName prop.
+  anchor: "(home)",
+  // A screen that crashes shows the fallback in its own place: the tab bar
+  // and the other tabs stay, and retry renders only that screen again.
+  // Covered by components/RouteErrorBoundary.test.tsx.
+  screenErrorBoundary: RouteErrorBoundary,
+};
 
 const IS_ANDROID_TV = Platform.isTV && Platform.OS === "android";
 
 function TVTabLayout() {
-  const { settings } = useSettings();
   const { t } = useTranslation();
   const segments = useSegments();
   const router = useRouter();
-  const liveTv = useLiveTvAvailable();
 
   const currentTab = segments.find(isTabRoute);
   const atTabRoot = isAtTabRoot(segments);
+  const { settings } = useSettings();
+  const watchlists = showsWatchlists(settings);
+  const liveTv = useLiveTvAvailable();
 
-  const tabs: TVNavBarTab[] = useMemo(
-    () =>
-      [
-        { key: "(home)", label: t("tabs.home") },
-        { key: "(search)", label: t("tabs.search") },
-        { key: "(favorites)", label: t("tabs.favorites") },
-        liveTv ? { key: "(livetv)", label: t("live_tv.title") } : null,
-        !settings?.streamyStatsServerUrl || settings?.hideWatchlistsTab
-          ? null
-          : { key: "(watchlists)", label: t("watchlists.title") },
-        { key: "(libraries)", label: t("tabs.library") },
-        !settings?.showCustomMenuLinks
-          ? null
-          : { key: "(custom-links)", label: t("tabs.custom_links") },
-        { key: "(settings)", label: t("tabs.settings") },
-      ].filter((tab): tab is TVNavBarTab => tab !== null),
-    [
-      settings?.streamyStatsServerUrl,
-      settings?.hideWatchlistsTab,
-      settings?.showCustomMenuLinks,
-      liveTv,
-      t,
-    ],
-  );
+  const tabs: TVNavBarTab[] = useMemo(() => {
+    const labels: Record<TVTabGroup, string> = {
+      "(home)": t("tabs.home"),
+      "(search)": t("tabs.search"),
+      "(tv-favorites)": t("tabs.favorites"),
+      "(livetv)": t("live_tv.title"),
+      "(tv-watchlists)": t("watchlists.title"),
+      "(libraries)": t("tabs.library"),
+      "(tv-settings)": t("tabs.settings"),
+    };
+    return tvTabGroups(watchlists, liveTv).map((key) => ({
+      key,
+      label: labels[key],
+    }));
+  }, [t, watchlists, liveTv]);
 
   const activeTabKey = currentTab ?? "(home)";
-
-  const visibleKeys = useMemo(
-    () => new Set(tabs.map((tab) => tab.key)),
-    [tabs],
-  );
 
   const handleTabChange = useCallback(
     (key: string) => {
@@ -105,6 +97,7 @@ function TVTabLayout() {
       if (key === "(home)") eventBus.emit("scrollToTop");
       if (key === "(search)") eventBus.emit("searchTabPressed");
 
+      // The Live TV group has no page of its own: tabRootHref opens its screen.
       router.replace(tabRootHref(key) as never);
     },
     [currentTab, router],
@@ -115,22 +108,17 @@ function TVTabLayout() {
   }, [router]);
   useTVTabRootBackHandler(navigateHome, atTabRoot, currentTab);
 
-  // If current tab is no longer visible (setting changed), navigate to home
+  // A settings refresh can take Watchlists out of the bar while it is open;
+  // tvOS's native tabs handle that themselves, this JS bar does not.
+  const tabGone = isTVTabGone(currentTab, watchlists, liveTv);
   useEffect(() => {
-    if (!visibleKeys.has(activeTabKey) && activeTabKey !== "(home)") {
-      router.replace("/(auth)/(tabs)/(home)");
-    }
-  }, [visibleKeys, activeTabKey, router]);
+    if (tabGone) navigateHome();
+  }, [tabGone, navigateHome]);
 
   return (
     <View style={{ flex: 1 }}>
       <SystemBars hidden={false} style='light' />
-      <Stack
-        screenOptions={{ headerShown: false, animation: "none" }}
-        initialRouteName='(home)'
-      >
-        <Stack.Screen name='index' redirect />
-      </Stack>
+      <Stack screenOptions={{ headerShown: false, animation: "none" }} />
       <TVNavBar
         tabs={tabs}
         activeTabKey={activeTabKey}
@@ -148,12 +136,20 @@ function TVTabLayout() {
 }
 
 export default function TabLayout() {
-  const { settings } = useSettings();
   const { t } = useTranslation();
-  const liveTv = useLiveTvAvailable();
+  const segments = useSegments();
 
   // Must be called before any conditional return (rules of hooks)
   useTVHomeBackHandler();
+  const { settings } = useSettings();
+  const watchlists = showsWatchlists(settings);
+  const liveTv = useLiveTvAvailable();
+
+  // "/" lands on this group's index route, and native tabs render only their
+  // tabs: the app launched on a black screen. Send it to Home from here.
+  if (segments.at(-1) === "(tabs)") {
+    return <Redirect href='/(auth)/(tabs)/(home)' />;
+  }
 
   if (IS_ANDROID_TV) {
     return <TVTabLayout />;
@@ -168,118 +164,115 @@ export default function TabLayout() {
       {Platform.OS === "ios" && !Platform.isTV && <AppKeyCommands />}
       {Platform.OS === "ios" && !Platform.isTV && <MacWindowSize />}
       {/* The Mac draws its own sidebar beside the tabs, in place of the tab
-          bar; see MacSidebar. */}
+          bar; see MacSidebar and sidebar-adaptable-breaks-in-a-mac-window. */}
       <View style={{ flex: 1, flexDirection: "row" }}>
         {macSidebar && <MacSidebar />}
         <View style={{ flex: 1 }}>
           <NativeTabs
+            hidden={macSidebar}
             sidebarAdaptable={usesNativeSidebar() && !macSidebar}
-            tabBarHidden={macSidebar}
-            tabBarStyle={{
-              backgroundColor: "#121212",
-            }}
-            tabBarActiveTintColor={Platform.isTV ? "#FFFFFF" : Colors.primary}
-            activeIndicatorColor={"#392c3b"}
-            scrollEdgeAppearance='default'
+            backgroundColor='#121212'
+            tintColor={Platform.isTV ? "#FFFFFF" : Colors.primary}
+            indicatorColor='#392c3b'
           >
-            <NativeTabs.Screen redirect name='index' />
-            <NativeTabs.Screen
-              listeners={(_e) => ({
-                tabPress: (_e) => {
-                  eventBus.emit("scrollToTop");
-                },
-              })}
+            <NativeTabs.Trigger
               name='(home)'
-              options={{
-                title: t("tabs.home"),
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/house.fill.png")
-                    : (_e) => ({ sfSymbol: "house.fill" }),
-              }}
-            />
-            <NativeTabs.Screen
-              listeners={(_e) => ({
-                tabPress: (_e) => {
-                  eventBus.emit("searchTabPressed");
-                },
-              })}
+              listeners={{ tabPress: () => eventBus.emit("scrollToTop") }}
+            >
+              <NativeTabs.Trigger.Label>
+                {t("tabs.home")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon
+                sf='house.fill'
+                src={require("@/assets/icons/house.fill.png")}
+              />
+            </NativeTabs.Trigger>
+            <NativeTabs.Trigger
               name='(search)'
-              options={{
-                role: "search",
-                title: t("tabs.search"),
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/magnifyingglass.png")
-                    : (_e) => ({ sfSymbol: "magnifyingglass" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(favorites)'
-              options={{
-                title: t("tabs.favorites"),
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/heart.fill.png")
-                    : (_e) => ({ sfSymbol: "heart.fill" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(livetv)'
-              options={{
-                title: t("live_tv.title"),
-                tabBarItemHidden: !liveTv,
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/tv.fill.png")
-                    : (_e) => ({ sfSymbol: "tv.fill" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(watchlists)'
-              options={{
-                title: t("watchlists.title"),
-                tabBarItemHidden:
-                  !settings?.streamyStatsServerUrl ||
-                  settings?.hideWatchlistsTab,
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/list.star.png")
-                    : (_e) => ({ sfSymbol: "list.star" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(libraries)'
-              options={{
-                title: t("tabs.library"),
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/rectangle.stack.fill.png")
-                    : (_e) => ({ sfSymbol: "rectangle.stack.fill" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(custom-links)'
-              options={{
-                title: t("tabs.custom_links"),
-                tabBarItemHidden: !settings?.showCustomMenuLinks,
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/link.png")
-                    : (_e) => ({ sfSymbol: "link" }),
-              }}
-            />
-            <NativeTabs.Screen
-              name='(settings)'
-              options={{
-                title: t("tabs.settings"),
-                tabBarItemHidden: !Platform.isTV,
-                tabBarIcon:
-                  Platform.OS === "android"
-                    ? (_e) => require("@/assets/icons/gearshape.fill.png")
-                    : (_e) => ({ sfSymbol: "gearshape.fill" }),
-              }}
-            />
+              // On tvOS the search role turns the tab into a bare magnifier; without
+              // it the tab keeps its label, as the TV bar always had.
+              role={Platform.isTV ? undefined : "search"}
+              // A search tab that activates its field when selected is left when
+              // the field closes: iOS goes back to the previous tab. Without the
+              // activation iOS 27 folds the tab into the bar, hence prominent.
+              disableAutomaticSearchActivation
+              prominent={!Platform.isTV}
+              listeners={{ tabPress: () => eventBus.emit("searchTabPressed") }}
+            >
+              <NativeTabs.Trigger.Label>
+                {t("tabs.search")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon
+                sf='magnifyingglass'
+                src={require("@/assets/icons/magnifyingglass.png")}
+              />
+            </NativeTabs.Trigger>
+            {/* The TV bar keeps every section as a tab (utils/tvTabs.ts).
+            tvOS reports focus coming back to the selected tab as a repeated
+            selection, which pops the tab to its root: a page with nothing to
+            focus yet, such as a watchlist while it loads, sends focus there at
+            once and closed before it showed. */}
+            <NativeTabs.Trigger
+              name='(tv-favorites)'
+              hidden={!Platform.isTV}
+              disablePopToTop
+            >
+              <NativeTabs.Trigger.Label>
+                {t("tabs.favorites")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon sf='heart.fill' />
+            </NativeTabs.Trigger>
+            {/* SuperFin: Live TV is a tab of its own, after Favorites on TV and
+            after Search on the phone, shown when the server has it. */}
+            <NativeTabs.Trigger name='(livetv)' hidden={!liveTv}>
+              <NativeTabs.Trigger.Label>
+                {t("live_tv.title")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon
+                sf='tv.fill'
+                src={require("@/assets/icons/tv.fill.png")}
+              />
+            </NativeTabs.Trigger>
+            <NativeTabs.Trigger
+              name='(tv-watchlists)'
+              hidden={!Platform.isTV || !watchlists}
+              disablePopToTop
+            >
+              <NativeTabs.Trigger.Label>
+                {t("watchlists.title")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon sf='list.star' />
+            </NativeTabs.Trigger>
+            <NativeTabs.Trigger name='(libraries)'>
+              <NativeTabs.Trigger.Label>
+                {t("tabs.library")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon
+                sf='rectangle.stack.fill'
+                src={require("@/assets/icons/rectangle.stack.fill.png")}
+              />
+            </NativeTabs.Trigger>
+            {/* Favorites, watchlists, downloads, custom links, sessions and
+            settings: the phone bar keeps four tabs, the rest is in this menu. */}
+            <NativeTabs.Trigger name='(more)' hidden={Platform.isTV}>
+              <NativeTabs.Trigger.Label>
+                {t("tabs.more")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon
+                sf='ellipsis'
+                src={require("@/assets/icons/ellipsis.png")}
+              />
+            </NativeTabs.Trigger>
+            <NativeTabs.Trigger
+              name='(tv-settings)'
+              hidden={!Platform.isTV}
+              disablePopToTop
+            >
+              <NativeTabs.Trigger.Label>
+                {t("tabs.settings")}
+              </NativeTabs.Trigger.Label>
+              <NativeTabs.Trigger.Icon sf='gearshape.fill' />
+            </NativeTabs.Trigger>
           </NativeTabs>
         </View>
       </View>

@@ -119,8 +119,15 @@ export const MacSidebar = () => {
     (library) => current === "(libraries)" && pathname.includes(library.Id!),
   );
 
+  // Favorites and Watchlists share More's group, so a section in it is the
+  // one on screen only when its own page is.
+  const isOpen = (item: MacSidebarItem) =>
+    item.segment === current &&
+    (!item.page || segments[3] === item.page) &&
+    !openLibrary;
+
   const open = (item: MacSidebarItem) => {
-    if (item.segment === current && !openLibrary) {
+    if (isOpen(item)) {
       // The tab bar's own tabs do this on a second press.
       if (item.segment === "(home)") eventBus.emit("scrollToTop");
       if (item.segment === "(search)") eventBus.emit("searchTabPressed");
@@ -149,11 +156,11 @@ export const MacSidebar = () => {
       >
         {macSidebarItems(settings, liveTv).map((item) => (
           <SidebarRow
-            key={item.segment}
-            testID={`mac-sidebar-${item.segment}`}
+            key={item.id}
+            testID={`mac-sidebar-${item.id}`}
             icon={item.icon}
             title={t(item.titleKey)}
-            active={item.segment === current && !openLibrary}
+            active={isOpen(item)}
             onPress={() => open(item)}
           />
         ))}
