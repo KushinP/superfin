@@ -151,3 +151,12 @@ Mac.
    until a follow-up fixes it?
    **Default:** try hard to keep the sidebar. If it can't be done in step 2, ship with the
    tab bar on the Mac and note it in the PR.
+
+## Changes
+
+- 2026-11-16: the build found things the spec did not name, recorded in the
+  plan's Changes: a multiview memory risk on the Fire TV from upstream's
+  ExoPlayer buffer (fixed), two iOS player compile errors (fixed), three
+  upstream guide tests dropped with Kush's approval, and an Expo patch bump
+  left for its own PR. A7 is covered by "settings saved before the upstream
+  catch-up" in `utils/atoms/settings.test.ts`.

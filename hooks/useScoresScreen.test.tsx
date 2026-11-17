@@ -1,5 +1,6 @@
-import { act, renderHook } from "@testing-library/react-native";
-import { Platform } from "react-native";
+import { act, render, renderHook, screen } from "@testing-library/react-native";
+import type { ReactElement } from "react";
+import { Dimensions, Platform, StyleSheet } from "react-native";
 import { useScoresScreen } from "./useScoresScreen";
 
 const mockPush = jest.fn();
@@ -11,11 +12,24 @@ const mockShowModal = jest.fn();
 jest.mock("@/providers/GlobalModalProvider", () => ({
   useGlobalModal: () => ({ showModal: mockShowModal, hideModal: jest.fn() }),
 }));
-// The sheet's native scroll view can't load under Jest; only which way the
-// screen opens is tested here.
-jest.mock("@gorhom/bottom-sheet", () => ({
-  BottomSheetScrollView: ({ children }: { children: unknown }) => children,
-}));
+// The sheet's native scroll view can't load under Jest: a plain view that
+// keeps its style stands in for it.
+jest.mock("@gorhom/bottom-sheet", () => {
+  const { View } = require("react-native");
+  return {
+    BottomSheetScrollView: ({
+      children,
+      style,
+    }: {
+      children: unknown;
+      style: unknown;
+    }) => (
+      <View testID='scores-sheet' style={style}>
+        {children}
+      </View>
+    ),
+  };
+});
 jest.mock("@/components/multiview/ScoresScreenContent", () => ({
   ScoresScreenContent: () => null,
 }));
@@ -54,8 +68,12 @@ describe("useScoresScreen", () => {
     await act(async () => result.current());
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockShowModal).toHaveBeenCalledTimes(1);
-    expect(mockShowModal.mock.calls[0][1]).toMatchObject({
-      snapPoints: ["50%"],
-    });
+    // Upstream's sheet sizes itself to its content (snap points are gone),
+    // so the sheet caps its own height at half the window.
+    await render(mockShowModal.mock.calls[0][0] as ReactElement);
+    const style = StyleSheet.flatten(
+      screen.getByTestId("scores-sheet").props.style,
+    );
+    expect(style.maxHeight).toBe(Dimensions.get("window").height / 2);
   });
 });

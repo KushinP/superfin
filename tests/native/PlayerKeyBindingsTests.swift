@@ -1,8 +1,8 @@
 import Foundation
 
-/// The player's keyboard map on an iPad and the Mac: each key lands on the
-/// action it is listed for, no key is bound twice, and volume steps stay in
-/// range.
+/// SuperFin's keys in the player on an iPad and the Mac, beside upstream's
+/// PlayerKeyboardPolicy: each lands on its action, none is one the policy
+/// owns, no key is bound twice, and volume steps stay in range.
 @main
 enum PlayerKeyBindingsTests {
     static func expect(_ condition: Bool, _ message: @autoclosure () -> String) {
@@ -10,9 +10,11 @@ enum PlayerKeyBindingsTests {
     }
 
     static func main() {
-        expect(PlayerKeyBindings.action(for: " ") == .playPause, "space plays and pauses")
-        expect(PlayerKeyBindings.action(for: PlayerKeyBindings.leftArrow) == .seekBackward, "left skips back")
-        expect(PlayerKeyBindings.action(for: PlayerKeyBindings.rightArrow) == .seekForward, "right skips forward")
+        // Space, left and right are upstream's PlayerKeyboardPolicy: bound here
+        // too, each press would play and pause, or seek, twice.
+        expect(PlayerKeyBindings.action(for: " ") == nil, "space is the keyboard policy's")
+        expect(PlayerKeyBindings.action(for: PlayerKeyBindings.leftArrow) == nil, "left is the keyboard policy's")
+        expect(PlayerKeyBindings.action(for: PlayerKeyBindings.rightArrow) == nil, "right is the keyboard policy's")
         expect(PlayerKeyBindings.action(for: PlayerKeyBindings.upArrow) == .volumeUp, "up raises the volume")
         expect(PlayerKeyBindings.action(for: PlayerKeyBindings.downArrow) == .volumeDown, "down lowers the volume")
         expect(PlayerKeyBindings.action(for: "m") == .toggleMute, "m mutes")

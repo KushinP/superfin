@@ -34,9 +34,10 @@ Read the relevant one before writing code in that area.
 | [docs/conventions/constants.md](docs/conventions/constants.md) | Adding a threshold, interval, ratio, storage key, or any value used twice |
 | [docs/conventions/contributing-flow.md](docs/conventions/contributing-flow.md) | Opening, describing, or reviewing a PR |
 | [docs/conventions/performance.md](docs/conventions/performance.md) | Claiming a change is faster, or writing a Reassure scenario |
-| [docs/conventions/testing.md](docs/conventions/testing.md) | Writing or changing any test, and before claiming a fix works |
+| [docs/conventions/testing.md](docs/conventions/testing.md) | Writing or changing any test, adding or unmocking a `jest.mock`, and before claiming a fix works |
 | [docs/conventions/tv.md](docs/conventions/tv.md) | Touching anything that renders on Apple TV or Android TV |
 | [docs/conventions/upstream-sync.md](docs/conventions/upstream-sync.md) | Reviewing the upstream sync PR, resolving its conflicts, or editing a fork only file |
+| [docs/conventions/window-dimensions.md](docs/conventions/window-dimensions.md) | Reading window width or height in a component, screen, or hook |
 
 Deep dives: [tv-modal-guide.md](docs/tv-modal-guide.md),
 [tv-focus-guide.md](docs/tv-focus-guide.md), [tv-discovery.md](docs/tv-discovery.md),
@@ -66,6 +67,7 @@ UI and headers:
 - `switch-pointerevents-ignored` | Switch ignores its own pointerEvents (Android); wrap in a View pointerEvents="none"
 - `nativewind-classname-arrives-as-style` | a className passed to one of our own components reaches it as `style`; forward that, reading `className` drops it silently
 - `bottom-sheet-dismiss-before-present` | dismiss() on a BottomSheetModal that is not on screen leaves it unable to present, silently; follow `open` with useSheetOpenState
+- `sheets-draw-under-the-android-nav-bar` | use `@/hooks/useActionSheet`; `showModal` content goes in `SheetView` / `SheetScrollView`, a sheet's FlatList takes `useSheetContentPadding()`
 - `swiftui-host-dead-while-keyboard-is-up` | an @expo/ui Host honors the keyboard safe area, so a small one draws but takes no taps while a keyboard is up; set ignoreSafeArea='keyboard'
 
 State and data:
@@ -78,12 +80,16 @@ State and data:
 - `polling-query-rewrites-persisted-cache` | a persisted query with `refetchInterval` re-serializes the whole persisted cache every tick, even when its data never changes (`withoutRedundantSaves` only skips the ticks of queries that are not persisted); enable it only while a consumer is focused, with `gcTime: 0`
 
 Native modules:
+- `exoplayer-loadcontrol-time-not-bytes` | prioritize=true is the stuck-buffer fix; the 256MB heap needs a 96MiB byte target (min 5s/max 30s) + 3s back buffer: the forward buffer holds min(bitrate × 30s, 96MiB) but never less than bitrate × 5s, plus bitrate × 3s behind (75MB forward at 20Mbps, ~150MB in all at 150Mbps), where the old setup filled bitrate × 20s and OOM'd a ~100Mbps DV remux (loader → error_code_io_unspecified, or an unrelated thread kills the process); constants duplicated in ExoPlayerView.kt AND ExoPlayerEngine.kt, keep in lockstep
+- `exo-chrome-rebuilds-player-per-load` | the chrome's ExoPlayerEngine releases and rebuilds the player on every accepted load; preparing a new source on the instance that just hit STATE_ENDED stalled the next-episode swap for minutes; ExoPlayerView.kt deliberately keeps one instance (onTracksReady is once-per-view)
 - `expo-view-props-fail-silently` | `try? prop.set()` drops failed prop conversions with NO error; use a JSON string prop
 - `mpv-tvos-player-exit-freeze` | mpv_terminate_destroy deadlocks main thread; use DispatchQueue.global()
 - `mpv-avfoundation-composite-osd-ordering` | MUST follow vo=avfoundation, before hwdec options
 - `thread-safe-state-for-stop-flags` | Stop flags need synchronous setter (stateQueue.sync not async)
 - `native-swiftui-view-sizing` | Need explicit frame + intrinsicContentSize override in ExpoView
 - `engine-agnostic-native-chrome` | The Android TV chrome consumes PlayerEngine; engine rides config.engine, resolvers split engine vs renderer
+- `amlogic-dts-decoder-silent` | Amlogic's platform DTS decoder emits silence on DTS-HD without erroring; on bitstream-capable output DTS decode is steered to FFmpeg via dtsExcludingMediaCodecSelector (twin files)
+- `native-player-ignores-js-controls` | the iPhone/iPad default player is a presented native view controller; Controls.tsx and its hooks never mount there, so input (keyboard) needs a native counterpart
 - `mpv-view-first-progress-tick-is-zero` | the MPV renderer emits its position cache once the duration is known; load() seeds it from startPosition, and JS player reports read resolveSessionPositionTicks, never progress.get()
 - `sentry-native-options-fail-silently` | sentry-cocoa ignores an option key it does not know, with no error; check the spelling in Options+Dictionary.swift
 - `avaudiosession-calls-block-on-the-audio-server` | every AVAudioSession setter AND getter is a synchronous XPC call that can take seconds; never on main, session changes go through PlayerAudioSession
@@ -97,6 +103,8 @@ Native modules:
 - `exoplayer-view-must-not-release-on-detach` | a view is detached and reattached while on screen (a re-order, the Fire TV long-press sheet); ExoPlayerView releases only via JS destroy() and OnViewDestroys, never onDetachedFromWindow
 - `fire-os-media-keys-go-to-a-media-session` | Fire OS sends ⏯ ⏪ ⏩ to the media-button session, never as key events; MediaKeySession takes key presses only (Alexa attaches to it), and ⏪ ⏩ need their own case
 - `native-player-presented-after-dismiss` | iOS keeps the player session until the cross-dissolve ends, so present() right after onDismiss is refused; a new player waits for the closing one, and a swap whose player closed is dropped unless its stream ended and another item was asked for
+- `android17-background-audio-needs-media-fgs` | Android 17 mutes an app with no visible activity and no foreground service (`AudioHardening ... level: partial` in logcat); mpv stalls on the muted sink. The player screen holds the mediaPlayback service from MediaPlaybackController while it is open, paused included; a start refused in the background leaves it without one until the next play in front
+- `mpv-surface-loss-drops-video-track-and-seeks` | a detached surface fails mpv's VO, the video track is dropped and the refresh seek can restart at byte 0 of an unindexed MKV (20 s+ stall at 2h in); detachSurface attaches an offscreen ImageReader sink instead, on Android 10 and later only
 
 TV platform:
 - `tv-modals-must-use-navigation-pattern` | Use atom+router.push(), never overlay/absolute modals
@@ -106,7 +114,10 @@ TV platform:
 - `platform-specific-file-suffix-does-not-work` | .tv.* only resolves under EXPO_TV=1; require the TV file explicitly behind Platform.isTV
 - `tvfocusguideview-ignores-display-style` | TVFocusGuideView sets its own display last, so `display: "none"` in its style is ignored; hide it with `enabled={false}`
 - `fire-tv-no-playback-check-route-and-memory` | nothing plays or it stutters: check the stream URL (tunnel vs LAN), an older build, and the TV's free memory before blaming the app
+- `tv-nav-tab-catches-short-grid-edge-press` | from the end of a grid narrower than the TV tab bar, a left or right press goes to the outermost tab; trap left/right on the grid (a full-width guide row is never the target)
 - `android-tv-modal-close-loses-focus` | a dismissed TV modal route leaves Android TV with nothing focused; the page must hand the focus back with requestTVFocus(). BlurView only tints there
+- `amlogic-fra-fires-before-real-framerate` | the vendor HDMI frame-rate adaptation switches on the codec's 30fps default, before MKV's real rate is known, and never corrects; app-side preferredDisplayModeId matching (matchRefreshRate setting) is the fix
+- `tv-preferred-focus-grabs-on-mount` | hasTVPreferredFocus takes the focus as the view enters the window, out of the tab bar too (tvOS when the bar lands on a tab, Android TV on every press that opens one); tab roots must not set it on mount, Home only once per session
 
 Build and tooling:
 - `eas-archive-drops-gitignored-tracked-files` | EAS uploads skip anything matching .gitignore even if tracked; re-include required assets, keep asset require() at module scope
@@ -117,6 +128,7 @@ Build and tooling:
 - `require-hooks-leak-across-jest-specs` | a require hook (tsx/cjs) registered from a spec stays on the Jest worker's Node loader and breaks later specs; map it to a stub
 - `expo-image-prebuilt-glide-logs` | Expo's prebuilt expo-image AAR ships with Glide logs on, every image URL (trickplay ApiKey included) reaches logcat; built from source instead
 - `repack-shrunk-resources-missing-attrs` | AGP 9's R8 resource shrinking leaves XML naming attributes it removed; apktool cannot relink them, so the Android repack declares them and builds again
+- `expo-prebuilt-modules-need-matching-rn` | the prebuilt ExpoModulesCore uses React core classes of the RN patch the SDK targets; expo-modules-core 58.0.30 on react-native-tvos 0.88.0-0 dies in dyld at every iOS launch while the build stays green
 
 ## Project overview
 
@@ -162,7 +174,7 @@ bun run test:unit            # Jest, the whole suite
 bun run test:coverage        # Jest plus a coverage report in coverage/
 bun run perf                 # Reassure performance scenarios (*.perf-test.tsx)
 bun run perf:baseline        # Reassure baseline to compare `bun run perf` against
-bun run test                 # The full gate: typecheck, unit, lint, format, i18n, doctor
+bun run test                 # The full gate: typecheck, unit, e2e bench, lint, format, i18n, doctor
 
 # iOS specific
 bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build errors
@@ -198,12 +210,12 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
 | `patches/` | Patch package overrides |
 | `augmentations/` | Type augmentations |
 | `test-utils/` | Shared test doubles: Jellyfin API, MMKV, the file system, custom headers, React Native, Reanimated, @expo/ui, drax |
-| `tests/native/` | Standalone native checks (subtitle geometry, app container paths), each run by its script in `scripts/ios/`, and subtitle playback fixtures |
+| `tests/native/` | Standalone native checks (subtitle geometry, app container paths, the hero's Dynamic Type cap), each run by its script in `scripts/ios/`, and subtitle playback fixtures |
 | `translations/` | i18n catalogues, `en.json` is the only source |
 | `scripts/` | Repo tooling run through bun |
 | `biome-plugins/` | Custom Biome (Grit) lint rules, wired up in `biome.json` |
 | `docs/` | Conventions and deep dives |
-| `e2e/` | Manual end to end fixtures that need Docker, never run in CI (a local Jellyfin for SyncPlay) |
+| `e2e/` | End-to-end bench and suites (test server, devices, Cast sender, Maestro flows), see `e2e/README.md` |
 
 ## Key patterns
 
@@ -226,6 +238,9 @@ bun run ios:install-metal-toolchain   # Fixes "missing Metal Toolchain" build er
   intro-skipper plugins, Web's static configuration, configurable custom sections,
   and external services (Seerr, StreamyStats, Marlin, OpenSubtitles, Wikidata,
   ESPN's public NFL scoreboard for live scores in multiview and the TV player).
+  One SDK endpoint is the exception: Auto quality's speed test
+  (`utils/jellyfin/bitrateTest.ts`) times the body of `/Playback/BitrateTest` as it
+  streams in, through expo/fetch, which Axios cannot; it sends the same headers.
   The SDK itself uses Axios; keep its custom-header transport and error handling.
   Plugin requests use the explicitly named `pluginGet` / `pluginPost` /
   `pluginPut` / `pluginDelete` extensions, not generic `Api.get` / `post` /

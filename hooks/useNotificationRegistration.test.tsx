@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
+import * as Notifications from "expo-notifications";
 import { createStore, Provider as JotaiProvider } from "jotai";
 import type { ReactNode } from "react";
 import { Platform } from "react-native";
@@ -9,18 +10,15 @@ import {
 import { offerSettingsLinkOnce } from "@/utils/notificationPermissions";
 import { useNotificationRegistration } from "./useNotificationRegistration";
 
+jest.mock("@/providers/JellyfinProvider", () =>
+  jest.requireActual("@/test-utils/realSessionAtoms"),
+);
+
 const mockPush = jest.fn();
-const mockNotifications = {
-  DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
-  getPermissionsAsync: jest.fn(),
-  requestPermissionsAsync: jest.fn(),
-  getExpoPushTokenAsync: jest.fn(),
-  setNotificationChannelAsync: jest.fn(),
-  addNotificationReceivedListener: jest.fn(),
-  addNotificationResponseReceivedListener: jest.fn(),
-  addPushTokenListener: jest.fn(),
-  AndroidImportance: { DEFAULT: 3 },
-};
+const mockNotifications = Notifications as unknown as Record<
+  keyof typeof Notifications,
+  jest.Mock
+>;
 
 // SuperFin: tokens are only asked for the build's own EAS project, which the
 // real app.json leaves out; these tests give it one, and one test takes it away.
@@ -36,27 +34,17 @@ jest.mock("expo-constants", () => ({
     },
   },
 }));
-jest.mock("expo-notifications", () => mockNotifications);
 jest.mock("expo-device", () => ({ isDevice: true }));
 jest.mock("@/hooks/useAppRouter", () => ({
   __esModule: true,
   default: () => ({ push: mockPush }),
 }));
-jest.mock("@/providers/JellyfinProvider", () => {
-  const { atom } = jest.requireActual("jotai");
-  return { userAtom: atom(null) };
-});
 jest.mock("@/utils/background-tasks", () => ({
   registerBackgroundFetchAsyncSessions: jest.fn(async () => {}),
   unregisterBackgroundFetchAsyncSessions: jest.fn(async () => {}),
 }));
 jest.mock("@/utils/notificationPermissions", () => ({
   offerSettingsLinkOnce: jest.fn(async () => {}),
-}));
-jest.mock("@/utils/log", () => ({
-  writeToLog: jest.fn(),
-  writeInfoLog: jest.fn(),
-  writeErrorLog: jest.fn(),
 }));
 jest.mock("@/utils/mmkv", () => ({
   storage: { getString: () => "true", set: jest.fn() },
@@ -86,7 +74,6 @@ const setTV = (isTV: boolean) =>
   Object.defineProperty(Platform, "isTV", { value: isTV, configurable: true });
 
 beforeEach(() => {
-  jest.clearAllMocks();
   mockConstants.expoConfig = {
     extra: { eas: { projectId: "superfin-project" } },
   };
